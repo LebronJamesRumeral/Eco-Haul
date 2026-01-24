@@ -245,6 +245,10 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
           className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          style={{
+            backgroundImage:
+              'linear-gradient(to bottom, var(--accent) 0%, color-mix(in srgb, var(--accent) 30%, var(--sidebar) 70%) 10%, var(--sidebar) 35%)',
+          }}
         >
           {children}
         </div>

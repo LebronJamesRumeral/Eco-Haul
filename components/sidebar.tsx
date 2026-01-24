@@ -81,8 +81,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
                   isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-sidebar-primary/30"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    ? "bg-gradient-to-r from-[var(--primary)] to-[color-mix(in srgb,var(--primary) 80%,black)] text-primary-foreground ring-2 ring-[var(--ring)] shadow-lg shadow-[color-mix(in_srgb,var(--primary)_40%,transparent)]"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-primary hover:ring-1 hover:ring-[var(--ring)]",
                 )}
               >
                 <Icon size={20} />

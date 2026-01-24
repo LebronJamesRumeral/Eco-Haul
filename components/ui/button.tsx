@@ -5,20 +5,21 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/60 focus-visible:ring-[4px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow-md active:scale-95',
+        default:
+          "bg-gradient-to-br from-primary via-primary to-[color-mix(in_srgb,var(--primary)_80%,black)] text-primary-foreground shadow-[0_8px_28px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] hover:shadow-[0_14px_40px_-6px_color-mix(in_srgb,var(--primary)_75%,transparent)] hover:brightness-110 active:scale-95 active:shadow-[0_4px_12px_-6px_color-mix(in_srgb,var(--primary)_60%,transparent)]",
         destructive:
-          'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 shadow-sm hover:shadow-md',
+          'bg-gradient-to-b from-destructive to-[color-mix(in_srgb,var(--destructive)_85%,black)] text-white shadow-md hover:shadow-lg focus-visible:ring-destructive/30 dark:focus-visible:ring-destructive/50 active:scale-95',
         outline:
-          'border border-border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hover:shadow-sm',
+          'border-2 border-primary/50 bg-background hover:border-primary hover:bg-primary/5 text-foreground shadow-sm hover:shadow-md dark:bg-input/20 dark:border-primary/40 dark:hover:bg-primary/10 focus-visible:ring-primary/60 active:scale-95',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm hover:shadow-md',
+          'bg-gradient-to-b from-accent/90 to-accent text-accent-foreground shadow-md hover:shadow-lg active:scale-95',
         ghost:
-          'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 hover:shadow-xs',
-        link: 'text-primary underline-offset-4 hover:underline',
+          'hover:bg-primary/10 text-foreground hover:text-primary dark:hover:bg-primary/20 hover:shadow-sm focus-visible:ring-primary/50 active:scale-95',
+        link: 'text-primary underline-offset-4 hover:underline font-semibold focus-visible:ring-primary/50',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',

@@ -56,15 +56,15 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-20 backdrop-blur-xl bg-card/80 border-b border-border px-4 py-3 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-20 backdrop-blur-xl bg-gradient-to-r from-card/95 via-card/90 to-card/85 border-b-2 border-primary/30 px-4 py-3 sm:px-6 lg:px-10 shadow-md">
       <div className="flex items-center gap-4 justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary grid place-items-center">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/40 via-primary/20 to-primary/10 text-primary grid place-items-center ring-2 ring-primary/60 shadow-lg">
             {getPageIcon()}
           </div>
           <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">Current View</span>
-            <h2 className="text-lg font-semibold text-foreground">{getPageTitle()}</h2>
+            <span className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Current View</span>
+            <h2 className="text-lg font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">{getPageTitle()}</h2>
           </div>
         </div>
 
@@ -72,7 +72,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="text-foreground hover:bg-muted"
+            className="text-foreground hover:bg-primary/10 hover:text-primary focus-visible:ring-primary/50"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"
             disabled={!mounted}
@@ -80,17 +80,17 @@ export function Header() {
             {mounted && theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
 
-          <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted">
+          <Button variant="ghost" size="icon" className="text-foreground hover:bg-primary/10 hover:text-primary focus-visible:ring-primary/50">
             <Bell size={18} />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary/20 text-primary grid place-items-center text-xs font-semibold">
+              <Button variant="outline" className="gap-2 border-primary/40 hover:border-primary/70 hover:bg-primary/5">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/40 to-primary/20 text-primary grid place-items-center text-xs font-bold shadow-md">
                   {user?.email?.[0]?.toUpperCase() || "U"}
                 </div>
-                <span className="hidden sm:inline text-sm font-medium">{user?.email || "Account"}</span>
+                <span className="hidden sm:inline text-sm font-semibold">{user?.email || "Account"}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
