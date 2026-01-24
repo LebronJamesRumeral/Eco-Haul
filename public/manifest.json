@@ -1,0 +1,37 @@
+{
+  "name": "EcoHaul - Mining Operations Dashboard",
+  "short_name": "EcoHaul",
+  "description": "Dump truck, driver, trip, and cost monitoring system for mining operations",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/pristine.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "permissions": [
+    "geolocation"
+  ],
+  "features": [
+    "gps",
+    "offline"
+  ]
+}
