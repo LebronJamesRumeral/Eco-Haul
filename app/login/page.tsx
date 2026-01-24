@@ -47,7 +47,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background" suppressHydrationWarning>
+    <div className="relative min-h-screen overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/10 to-transparent" aria-hidden="true" />
       <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_20%_20%,rgba(22,163,74,0.18),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.15),transparent_32%)]" aria-hidden="true" />
 
