@@ -13,7 +13,7 @@ export function Header() {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
@@ -22,6 +22,9 @@ export function Header() {
     logout()
     router.push('/login')
   }
+
+  // Get the actual theme being used (resolves 'system' to 'light' or 'dark')
+  const currentTheme = mounted ? resolvedTheme : 'light'
 
   const getPageTitle = () => {
     const segments = pathname.split("/").filter(Boolean)
@@ -73,11 +76,11 @@ export function Header() {
             variant="ghost"
             size="icon"
             className="text-foreground hover:bg-primary/10 hover:text-primary focus-visible:ring-primary/50"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"
             disabled={!mounted}
           >
-            {mounted && theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            {currentTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
 
           <Button variant="ghost" size="icon" className="text-foreground hover:bg-primary/10 hover:text-primary focus-visible:ring-primary/50">
