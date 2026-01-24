@@ -64,24 +64,6 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/pristine.jpg" type="image/jpeg" />
         <link rel="apple-touch-icon" href="/pristine.jpg" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('Service Worker registered:', registration.scope);
-                    },
-                    function(err) {
-                      console.log('Service Worker registration failed:', err);
-                    }
-                  );
-                });
-              }
-            `,
-          }}
-        />
       </head>
       <body className={`${_geist.className} ${_geistMono.className} font-sans antialiased`}
         suppressHydrationWarning
