@@ -1,15 +1,20 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function RootPage() {
   const router = useRouter()
+  const [isClient, setIsClient] = useState(false)
   
   useEffect(() => {
-    // Always redirect to login from root path
-    router.push('/login')
+    setIsClient(true)
+    // Redirect to login only after hydration
+    const timer = setTimeout(() => {
+      router.push('/login')
+    }, 0)
+    return () => clearTimeout(timer)
   }, [router])
 
-  return null
+  return isClient ? null : null
 }

@@ -85,8 +85,9 @@ export default function RootLayout({
       </head>
       <body className={`${_geist.className} ${_geistMono.className} font-sans antialiased`}
         suppressHydrationWarning
+        key="body"
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider>
           {children}
           <Analytics />
         </ThemeProvider>
