@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useDashboardStats, useTrips, useChartData, useDrivers, useTrucks } from '@/hooks/use-supabase-data'
+import { useDashboardStats, useTrips, useChartData, useDrivers, useTrucks, useAutoGenerateTrips } from '@/hooks/use-supabase-data'
 import { useAuth } from '@/hooks/use-auth'
 import { Skeleton } from '@/components/ui/skeleton'
 import { logout } from '@/lib/auth'
@@ -21,6 +21,8 @@ export default function AdminDashboard() {
   const { tripsPerDay, distancePerTruck, loading: chartLoading } = useChartData()
   const { drivers } = useDrivers()
   const { trucks } = useTrucks()
+  // Auto-generate trips from GPS data
+  const { lastGenerated } = useAutoGenerateTrips()
   const today = new Date().toISOString().split('T')[0]
   const [selectedDate, setSelectedDate] = useState(today)
   const [selectedDriver, setSelectedDriver] = useState<string>('all')

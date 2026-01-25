@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useComplianceChecks, createComplianceCheck, updateComplianceCheck } from "@/hooks/use-supabase-data"
+import { useComplianceChecks, createComplianceCheck, updateComplianceCheck, useTrips } from "@/hooks/use-supabase-data"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -32,6 +32,7 @@ export default function CompliancePage() {
     return () => clearTimeout(t)
   }, [search])
   const { checks, loading } = useComplianceChecks(debounced, status as any)
+  const { trips, loading: tripsLoading } = useTrips()
   const [site, setSite] = useState("")
   const [truck, setTruck] = useState("")
   const [newStatus, setNewStatus] = useState("Compliant")
@@ -98,6 +99,104 @@ export default function CompliancePage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Trip Verification Section */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20 text-green-600 font-bold">
+                ✓
+              </div>
+              <div>
+                <CardTitle>Trip Verification</CardTitle>
+                <CardDescription>GPS-tracked trips with automatic distance and cost verification</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {tripsLoading ? (
+                <Skeleton className="h-32 w-full" />
+              ) : trips && trips.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div className="p-4 rounded-lg bg-background/50 border border-border">
+                      <div className="text-sm text-muted-foreground mb-1">Total Verified Trips</div>
+                      <div className="text-2xl font-bold text-foreground">{trips.filter(t => t.distance && t.distance > 0).length}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/50 border border-border">
+                      <div className="text-sm text-muted-foreground mb-1">Total Distance</div>
+                      <div className="text-2xl font-bold text-foreground">
+                        {trips.filter(t => t.distance && t.distance > 0).reduce((sum, trip) => sum + (trip.distance || 0), 0).toFixed(2)} km
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/50 border border-border">
+                      <div className="text-sm text-muted-foreground mb-1">GPS Tracked</div>
+                      <div className="text-2xl font-bold text-accent">
+                        {((trips.filter(t => t.distance && t.distance > 0).length / Math.max(trips.length, 1)) * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary">
+                      <div className="text-sm text-muted-foreground mb-1">Total Cost</div>
+                      <div className="text-2xl font-bold text-primary">
+                        ₱{trips.filter(t => t.distance && t.distance > 0).reduce((sum, trip) => sum + ((trip.distance || 0) * 50), 0).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-border bg-background/50">
+                        <tr className="text-muted-foreground">
+                          <th className="text-left py-3 px-2">Trip ID</th>
+                          <th className="text-left py-3 px-2">Driver</th>
+                          <th className="text-right py-3 px-2">Distance (km)</th>
+                          <th className="text-right py-3 px-2">Cost (₱50/km)</th>
+                          <th className="text-left py-3 px-2">Duration</th>
+                          <th className="text-center py-3 px-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trips.slice(0, 15).map((trip) => {
+                          const isVerified = trip.distance && trip.distance > 0
+                          return (
+                            <tr key={trip.id} className="border-b border-border hover:bg-background/50">
+                              <td className="py-3 px-2 text-foreground text-xs">#{String(trip.id).slice(0, 8)}</td>
+                              <td className="py-3 px-2 text-foreground">{trip.driver_name || 'Unknown'}</td>
+                              <td className="py-3 px-2 text-right text-foreground">
+                                {isVerified ? `${(trip.distance || 0).toFixed(2)}` : '—'}
+                              </td>
+                              <td className="py-3 px-2 text-right font-semibold text-accent">
+                                {isVerified ? `₱${((trip.distance || 0) * 50).toLocaleString()}` : '₱0'}
+                              </td>
+                              <td className="py-3 px-2 text-muted-foreground text-xs">{trip.duration || '—'}</td>
+                              <td className="py-3 px-2 text-center">
+                                <Badge className={isVerified ? 'bg-green-500/20 text-green-700 hover:bg-green-500/20' : 'bg-yellow-500/20 text-yellow-700 hover:bg-yellow-500/20'}>
+                                  {isVerified ? '✓ Verified' : 'Pending'}
+                                </Badge>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {trips.length > 15 && (
+                    <div className="text-center text-xs text-muted-foreground mt-2">
+                      ... and {trips.length - 15} more trips
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="text-4xl mb-2">📋</div>
+                  <p className="text-muted-foreground">No GPS trips recorded yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Trip data will appear once drivers complete trips with GPS tracking</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Compliance Table */}
         <Card className="bg-card border-border">

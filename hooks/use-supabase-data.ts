@@ -1,6 +1,86 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, type Trip, type Truck, type Driver, type DashboardStats, type ComplianceCheck, type BillingRate, type PayrollRecord, type Site } from '@/lib/supabase'
 
+// Haversine formula to calculate distance between two GPS coordinates (in km)
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371 // Earth's radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+// Calculate total distance from GPS location points
+async function calculateDistanceFromGPS(driverId: number, tripId: number): Promise<number> {
+  try {
+    const { data: locations, error } = await supabase
+      .from('driver_locations')
+      .select('latitude, longitude, timestamp')
+      .eq('driver_id', driverId)
+      .eq('trip_id', tripId)
+      .order('timestamp', { ascending: true })
+
+    if (error || !locations || locations.length < 2) {
+      console.log('No GPS data for distance calculation:', error)
+      return 0
+    }
+
+    let totalDistance = 0
+    for (let i = 1; i < locations.length; i++) {
+      const prev = locations[i - 1]
+      const curr = locations[i]
+      const distance = calculateHaversineDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude)
+      totalDistance += distance
+    }
+
+    return Math.round(totalDistance * 100) / 100 // Round to 2 decimal places
+  } catch (err) {
+    console.error('Error calculating distance from GPS:', err)
+    return 0
+  }
+}
+
+// Calculate duration from GPS points (min to max timestamp)
+function calculateDurationFromTimestamps(startTime: string, endTime: string): string {
+  try {
+    // Parse time strings like "10:30 AM" or "2:45 PM"
+    const parseTime = (timeStr: string) => {
+      const match = timeStr.match(/(\d+):(\d+)\s(AM|PM)/)
+      if (!match) return null
+      let hours = parseInt(match[1])
+      const minutes = parseInt(match[2])
+      const period = match[3]
+      
+      if (period === 'PM' && hours !== 12) hours += 12
+      if (period === 'AM' && hours === 12) hours = 0
+      
+      return hours * 60 + minutes // Convert to minutes
+    }
+
+    const start = parseTime(startTime)
+    const end = parseTime(endTime)
+    
+    if (start === null || end === null) return '0h 00m'
+    
+    let duration = end - start
+    if (duration < 0) duration += 24 * 60 // Handle day wraparound
+    
+    const hours = Math.floor(duration / 60)
+    const minutes = duration % 60
+    
+    return `${hours}h ${String(minutes).padStart(2, '0')}m`
+  } catch (err) {
+    console.error('Error calculating duration:', err)
+    return '0h 00m'
+  }
+}
+
 // Create a manual trip entry for a driver (used when driver clicks "Start Trip")
 // If a trip is already active today (start_time === end_time), complete it
 // Otherwise create new trip
@@ -70,9 +150,21 @@ export async function createDriverTrip({
     const endTime = `${hours}:${String(mins).padStart(2, '0')} ${period}`
     console.log(`Updating end_time from ${activeTrip.start_time} to ${endTime}`)
     
+    // Calculate distance from GPS points and duration
+    const distance = await calculateDistanceFromGPS(driverId, activeTrip.id)
+    const duration = calculateDurationFromTimestamps(activeTrip.start_time, endTime)
+    const cost = `₱${(distance * 50).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`
+    
+    console.log(`Trip stats - Distance: ${distance}km, Duration: ${duration}, Cost: ${cost}`)
+    
     const { data, error } = await supabase
       .from('trips')
-      .update({ end_time: endTime })
+      .update({ 
+        end_time: endTime,
+        distance: distance.toString(),
+        duration: duration,
+        cost: cost
+      })
       .eq('id', activeTrip.id)
       .select()
 
@@ -948,22 +1040,29 @@ export function useGPSTracking() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const sendLocation = useCallback(async (driverId: number, position: GeolocationPosition) => {
+  const sendLocation = useCallback(async (driverId: number, position: GeolocationPosition, tripId?: number) => {
     setSending(true)
     setError(null)
 
     try {
+      const locationData: any = {
+        driver_id: driverId,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        speed: position.coords.speed || null,
+        heading: position.coords.heading || null,
+        timestamp: new Date().toISOString()
+      }
+      
+      // Link to trip if provided
+      if (tripId) {
+        locationData.trip_id = tripId
+      }
+
       const { data, error } = await supabase
         .from('driver_locations')
-        .insert({
-          driver_id: driverId,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          speed: position.coords.speed || null,
-          heading: position.coords.heading || null,
-          timestamp: new Date().toISOString()
-        })
+        .insert(locationData)
 
       if (error) throw error
       return data
@@ -1057,14 +1156,71 @@ export function useAutoGenerateTrips() {
       // Call the database function to auto-create trips
       const { data, error } = await supabase.rpc('auto_create_trips_from_gps')
 
-      if (error) throw error
+      if (error) {
+        // Check if function doesn't exist
+        if (error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist')) {
+          console.warn('⚠️ Database function auto_create_trips_from_gps() not found. Please run scripts/setup-gps-trips.sql in your Supabase SQL editor.')
+          setError('GPS function not deployed. Please contact administrator.')
+          return // Silent fail - don't throw
+        }
+        
+        console.error('RPC Error Details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        })
+        throw new Error(error.message || 'Failed to call auto_create_trips_from_gps')
+      }
+      
+      if (data) {
+        console.log('✅ Auto-generated trips from GPS:', data)
+      } else {
+        console.log('✅ RPC function executed successfully')
+      }
       
       setLastGenerated(new Date())
       return data
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to generate trips from GPS'
-      setError(message)
-      console.error('Auto-generate trips error:', err)
+      // If RPC fails, try manual trip creation from GPS data
+      console.warn('Falling back to manual trip generation from GPS data...', err)
+      
+      try {
+        // Get all drivers with GPS data today
+        const today = new Date().toISOString().split('T')[0]
+        const { data: drivers, error: driversError } = await supabase
+          .from('driver_locations')
+          .select('driver_id')
+          .gte('timestamp', `${today}T00:00:00`)
+          .lt('timestamp', `${today}T23:59:59`)
+
+        if (driversError) throw driversError
+
+        // Group by driver and create trips for each
+        const driverIds = [...new Set(drivers?.map(d => d.driver_id) || [])]
+        
+        for (const driverId of driverIds) {
+          const distance = await calculateDistanceFromGPS(driverId, today)
+          if (distance > 0) {
+            await createDriverTrip({
+              driver_id: driverId,
+              truck_id: undefined,
+              distance,
+              cost: distance * 50,
+              start_time: new Date().toISOString(),
+              end_time: new Date().toISOString(),
+              duration: '0h 00m'
+            })
+          }
+        }
+
+        console.log(`Manually created trips for ${driverIds.length} drivers`)
+        setLastGenerated(new Date())
+      } catch (fallbackErr) {
+        const message = fallbackErr instanceof Error ? fallbackErr.message : JSON.stringify(fallbackErr) || 'Unknown error generating trips from GPS'
+        setError(message)
+        console.error('Auto-generate trips error (both RPC and fallback failed):', message, err, fallbackErr)
+      }
     } finally {
       setGenerating(false)
     }
@@ -1072,10 +1228,18 @@ export function useAutoGenerateTrips() {
 
   // Auto-call on component mount and periodically
   useEffect(() => {
-    generateTripsFromGPS()
+    // Only call once on mount, not every time generateTripsFromGPS changes
+    generateTripsFromGPS().catch(err => {
+      console.error('Initial trip generation failed:', err)
+    })
     
     // Auto-generate every 5 minutes
-    const interval = setInterval(generateTripsFromGPS, 5 * 60 * 1000)
+    const interval = setInterval(() => {
+      generateTripsFromGPS().catch(err => {
+        console.error('Periodic trip generation failed:', err)
+      })
+    }, 5 * 60 * 1000)
+    
     return () => clearInterval(interval)
   }, [generateTripsFromGPS])
 

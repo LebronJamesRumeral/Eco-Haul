@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Download, Printer, FileSpreadsheet, Info } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
-import { usePayrollRecords, useDrivers, useSites, useTrucks, createPayrollRecord } from "@/hooks/use-supabase-data"
+import { usePayrollRecords, useDrivers, useSites, useTrucks, useTrips, createPayrollRecord } from "@/hooks/use-supabase-data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 
@@ -20,6 +20,7 @@ export default function BillingPage() {
   const { drivers } = useDrivers()
   const { sites, loading: sitesLoading } = useSites()
   const { trucks, loading: trucksLoading } = useTrucks()
+  const { trips, loading: tripsLoading } = useTrips()
   
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
@@ -31,6 +32,8 @@ export default function BillingPage() {
   const [filterDate, setFilterDate] = useState("")
   const [filterSite, setFilterSite] = useState("all")
   const [isSaving, setIsSaving] = useState(false)
+  const [useGPSCalculation, setUseGPSCalculation] = useState(false)
+  const [gpsDistance, setGpsDistance] = useState(0)
 
   const [tripInputs, setTripInputs] = useState({
     driverName: "",
@@ -85,6 +88,26 @@ export default function BillingPage() {
     }
   }
 
+  // Calculate GPS distance for selected driver's trips today
+  useEffect(() => {
+    if (tripInputs.driverId && trips) {
+      const driverTrips = trips.filter(t => 
+        t.driver_id === tripInputs.driverId && 
+        t.distance && 
+        t.distance > 0
+      )
+      const totalDistance = driverTrips.reduce((sum, trip) => sum + (trip.distance || 0), 0)
+      setGpsDistance(totalDistance)
+      
+      // Auto-enable GPS calculation if distance is available
+      if (totalDistance > 0 && !useGPSCalculation) {
+        setUseGPSCalculation(true)
+      }
+    } else {
+      setGpsDistance(0)
+    }
+  }, [tripInputs.driverId, trips])
+
   if (authLoading) {
     return (
       <DashboardLayout>
@@ -97,16 +120,24 @@ export default function BillingPage() {
     return null
   }
 
-  // NEW FORMULA: Total Cost = Trip Count × Price Per Unit × Volume
+  // DUAL FORMULA SYSTEM:
+  // GPS-based: Total Cost = Distance × ₱50/km
+  // Manual: Total Cost = Trip Count × Price Per Unit × Volume
   const calculateTotalCost = (tripCount: number, pricePerUnit: number, volume: number) => {
     return tripCount * pricePerUnit * volume
   }
 
-  const currentTotal = calculateTotalCost(
-    Number(tripInputs.tripCount) || 0,
-    Number(tripInputs.pricePerUnit) || 0,
-    Number(tripInputs.volume) || 0,
-  )
+  const calculateGPSCost = (distance: number) => {
+    return distance * 50 // ₱50 per kilometer
+  }
+
+  const currentTotal = useGPSCalculation && gpsDistance > 0
+    ? calculateGPSCost(gpsDistance)
+    : calculateTotalCost(
+        Number(tripInputs.tripCount) || 0,
+        Number(tripInputs.pricePerUnit) || 0,
+        Number(tripInputs.volume) || 0,
+      )
 
   const generateReceipt = async () => {
     if (!tripInputs.driverName || !tripInputs.truckNumber || tripInputs.tripCount === 0) {
@@ -503,11 +534,51 @@ export default function BillingPage() {
               </div>
               <div>
                 <CardTitle>Payroll Calculation</CardTitle>
-                <CardDescription>Formula: Trips × Price/{tripInputs.unitType} × Volume</CardDescription>
+                <CardDescription>
+                  {useGPSCalculation && gpsDistance > 0 
+                    ? '📍 GPS Formula: Distance (km) × ₱50/km' 
+                    : `Formula: Trips × Price/${tripInputs.unitType} × Volume`}
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* GPS Distance Display & Toggle */}
+            {gpsDistance > 0 && (
+              <div className="p-4 rounded-lg bg-green-500/10 border-2 border-green-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="text-2xl">📍</div>
+                    <div>
+                      <div className="text-sm font-semibold text-green-700 dark:text-green-400">GPS Data Available</div>
+                      <div className="text-xs text-muted-foreground">Automatically tracked distance from trips</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-green-600 dark:text-green-400">{gpsDistance.toFixed(2)} km</div>
+                      <div className="text-xs text-muted-foreground">Total Distance</div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useGPSCalculation}
+                        onChange={(e) => setUseGPSCalculation(e.target.checked)}
+                        className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                      />
+                      <span className="text-sm font-medium text-foreground">Use GPS</span>
+                    </label>
+                  </div>
+                </div>
+                {useGPSCalculation && (
+                  <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded">
+                    <Info size={14} />
+                    <span>GPS-based calculation: {gpsDistance.toFixed(2)} km × ₱50 = ₱{calculateGPSCost(gpsDistance).toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
               <div className="flex justify-between items-center p-4 rounded-lg bg-background/50 border border-border">
                 <div>
@@ -540,7 +611,10 @@ export default function BillingPage() {
                   <span className="text-sm text-muted-foreground">Calculation</span>
                 </div>
                 <div className="text-sm font-mono text-foreground mb-3">
-                  {tripInputs.tripCount} trips × ₱{tripInputs.pricePerUnit} × {tripInputs.volume.toFixed(2)} {tripInputs.unitType}
+                  {useGPSCalculation && gpsDistance > 0
+                    ? `${gpsDistance.toFixed(2)} km × ₱50/km`
+                    : `${tripInputs.tripCount} trips × ₱${tripInputs.pricePerUnit} × ${tripInputs.volume.toFixed(2)} ${tripInputs.unitType}`
+                  }
                 </div>
               </div>
             </div>
@@ -561,6 +635,95 @@ export default function BillingPage() {
               <Download size={18} className="mr-2" />
               {isSaving ? "Saving..." : "Save to Payroll History"}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* GPS-Based Earnings Summary */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20 text-green-600 font-bold">
+                📍
+              </div>
+              <div>
+                <CardTitle>GPS-Based Earnings</CardTitle>
+                <CardDescription>Calculated from automatically recorded trip distances</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {tripsLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : trips && trips.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-lg bg-background/50 border border-border">
+                      <div className="text-sm text-muted-foreground mb-1">Total Trips</div>
+                      <div className="text-2xl font-bold text-foreground">{trips.length}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/50 border border-border">
+                      <div className="text-sm text-muted-foreground mb-1">Total Distance</div>
+                      <div className="text-2xl font-bold text-foreground">
+                        {trips.reduce((sum, trip) => sum + (trip.distance || 0), 0).toFixed(2)} km
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/50 border border-border">
+                      <div className="text-sm text-muted-foreground mb-1">Rate per km</div>
+                      <div className="text-2xl font-bold text-accent">₱50</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary">
+                      <div className="text-sm text-muted-foreground mb-1">Total Earnings</div>
+                      <div className="text-2xl font-bold text-primary">
+                        ₱{(trips.reduce((sum, trip) => sum + ((trip.distance || 0) * 50), 0)).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Trip breakdown table */}
+                  <div className="border-t border-border pt-4 mt-4">
+                    <h3 className="font-semibold text-foreground mb-3">Trip Breakdown</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b border-border">
+                          <tr className="text-muted-foreground">
+                            <th className="text-left py-2">Trip ID</th>
+                            <th className="text-left py-2">Driver</th>
+                            <th className="text-right py-2">Distance (km)</th>
+                            <th className="text-right py-2">Cost (₱50/km)</th>
+                            <th className="text-left py-2">Duration</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trips.slice(0, 10).map((trip) => (
+                            <tr key={trip.id} className="border-b border-border hover:bg-background/50">
+                              <td className="py-2 text-foreground">#{String(trip.id).slice(0, 8)}</td>
+                              <td className="py-2 text-foreground">{trip.driver_name || 'Unknown'}</td>
+                              <td className="py-2 text-right text-foreground">{(trip.distance || 0).toFixed(2)}</td>
+                              <td className="py-2 text-right font-semibold text-accent">
+                                ₱{((trip.distance || 0) * 50).toLocaleString()}
+                              </td>
+                              <td className="py-2 text-muted-foreground text-xs">{trip.duration || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {trips.length > 10 && (
+                      <div className="text-center text-xs text-muted-foreground mt-2">
+                        ... and {trips.length - 10} more trips
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="text-4xl mb-2">📍</div>
+                  <p className="text-muted-foreground">No GPS trips recorded yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Drivers need to complete trips with GPS tracking to generate earnings</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

@@ -55,7 +55,8 @@ export function GPSTracker({ activeTrip }: GPSTrackerProps) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         async (position) => {
           try {
-            await sendLocation(user.driver_id!, position)
+            // Pass trip ID to link GPS point to trip
+            await sendLocation(user.driver_id!, position, activeTrip?.id)
             setTrackingStatus('active')
             setLastUpdate(new Date())
             setGeoError(null)

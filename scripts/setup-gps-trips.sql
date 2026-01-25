@@ -56,7 +56,7 @@ BEGIN
   v_prev_lon := NULL;
   
   -- Get the start time of the first trip for this driver on this date
-  SELECT EXTRACT(EPOCH FROM MIN(created_at))::BIGINT INTO v_trip_start_time
+  SELECT MIN(created_at) INTO v_trip_start_time
   FROM trips
   WHERE driver_id = p_driver_id 
   AND DATE(date) = p_date;
@@ -72,7 +72,7 @@ BEGIN
     FROM driver_locations
     WHERE driver_id = p_driver_id 
     AND DATE(timestamp) = p_date
-    AND timestamp >= TO_TIMESTAMP(v_trip_start_time)
+    AND timestamp >= v_trip_start_time
     ORDER BY timestamp ASC
   LOOP
     v_curr_lat := v_record.latitude;
@@ -94,12 +94,16 @@ $$ LANGUAGE plpgsql;
 
 -- Function to auto-generate trips from GPS location data
 CREATE OR REPLACE FUNCTION auto_create_trips_from_gps()
-RETURNS void AS $$
+RETURNS TABLE(
+  created_count INTEGER,
+  message TEXT
+) AS $$
 DECLARE
   v_driver_id INTEGER;
   v_gps_distance DECIMAL;
   v_trip_count INTEGER;
   v_cost DECIMAL;
+  v_created_count INTEGER := 0;
 BEGIN
   -- Process each driver with GPS data today
   FOR v_driver_id IN 
@@ -111,34 +115,39 @@ BEGIN
     -- Calculate distance traveled from GPS locations
     v_gps_distance := calculate_distance_from_gps(v_driver_id, CURRENT_DATE);
     
-    -- Count number of trip segments (based on GPS point clusters)
-    SELECT COUNT(DISTINCT DATE_TRUNC('hour', timestamp)) INTO v_trip_count
-    FROM driver_locations
-    WHERE driver_id = v_driver_id AND DATE(timestamp) = CURRENT_DATE;
-    
-    -- Calculate cost at ₱50 per km
-    v_cost := v_gps_distance * 50;
-    
-    -- Create or update trip record for today
-    INSERT INTO trips (date, driver_id, driver_name, truck_id, truck_number, distance, cost, start_time, end_time, duration)
-    SELECT 
-      CURRENT_DATE,
-      v_driver_id,
-      d.name,
-      d.truck_id,
-      d.truck_number,
-      v_gps_distance,
-      v_cost,
-      MIN(DATE_TRUNC('hour', dl.timestamp))::TEXT,
-      MAX(DATE_TRUNC('hour', dl.timestamp))::TEXT,
-      '0h 00m'
-    FROM drivers d
-    LEFT JOIN driver_locations dl ON d.id = dl.driver_id AND DATE(dl.timestamp) = CURRENT_DATE
-    WHERE d.id = v_driver_id
-    ON CONFLICT DO NOTHING;
+    -- Only create trip if there's distance recorded
+    IF v_gps_distance > 0 THEN
+      -- Count number of trip segments (based on GPS point clusters)
+      SELECT COUNT(DISTINCT DATE_TRUNC('hour', timestamp)) INTO v_trip_count
+      FROM driver_locations
+      WHERE driver_id = v_driver_id AND DATE(timestamp) = CURRENT_DATE;
+      
+      -- Calculate cost at ₱50 per km
+      v_cost := v_gps_distance * 50;
+      
+      -- Create or update trip record for today
+      INSERT INTO trips (date, driver_id, driver_name, truck_id, truck_number, distance, cost, start_time, end_time, duration)
+      SELECT 
+        CURRENT_DATE,
+        v_driver_id,
+        d.name,
+        d.truck_id,
+        d.truck_number,
+        v_gps_distance,
+        v_cost,
+        MIN(DATE_TRUNC('hour', dl.timestamp))::TEXT,
+        MAX(DATE_TRUNC('hour', dl.timestamp))::TEXT,
+        '0h 00m'
+      FROM drivers d
+      LEFT JOIN driver_locations dl ON d.id = dl.driver_id AND DATE(dl.timestamp) = CURRENT_DATE
+      WHERE d.id = v_driver_id
+      ON CONFLICT DO NOTHING;
+      
+      v_created_count := v_created_count + 1;
+    END IF;
   END LOOP;
   
-  RAISE NOTICE 'Auto-trip generation complete for today';
+  RETURN QUERY SELECT v_created_count, 'Auto-trip generation complete for ' || v_created_count::TEXT || ' drivers';
 END;
 $$ LANGUAGE plpgsql;
 
