@@ -13,6 +13,7 @@ export type Trip = {
   truck_number: string
   driver_id: number
   driver_name: string
+  driver_receipt_number: string
   start_time: string
   end_time: string
   distance: number
@@ -83,7 +84,8 @@ export type PayrollRecord = {
   trip_count: number
   price_per_unit: number // Price per CBM or Ton at time of entry
   volume: number // CBM or Tonnage (after 5% reduction)
-  total_cost: number // trip_count × price_per_unit × volume
+  total_cost: number // Billing: trip_count × price_per_unit × volume
+  payroll_cost?: number // Payroll: based on trip tiers (1-2: ×400, 3: ×500, 4+: ×625)
   site_id?: number
   site_name?: string
   unit_type?: string // 'CBM' or 'TON'

@@ -32,8 +32,6 @@ export default function BillingPage() {
   const [filterDate, setFilterDate] = useState("")
   const [filterSite, setFilterSite] = useState("all")
   const [isSaving, setIsSaving] = useState(false)
-  const [useGPSCalculation, setUseGPSCalculation] = useState(false)
-  const [gpsDistance, setGpsDistance] = useState(0)
 
   const [tripInputs, setTripInputs] = useState({
     driverName: "",
@@ -88,26 +86,6 @@ export default function BillingPage() {
     }
   }
 
-  // Calculate GPS distance for selected driver's trips today
-  useEffect(() => {
-    if (tripInputs.driverId && trips) {
-      const driverTrips = trips.filter(t => 
-        t.driver_id === tripInputs.driverId && 
-        t.distance && 
-        t.distance > 0
-      )
-      const totalDistance = driverTrips.reduce((sum, trip) => sum + (trip.distance || 0), 0)
-      setGpsDistance(totalDistance)
-      
-      // Auto-enable GPS calculation if distance is available
-      if (totalDistance > 0 && !useGPSCalculation) {
-        setUseGPSCalculation(true)
-      }
-    } else {
-      setGpsDistance(0)
-    }
-  }, [tripInputs.driverId, trips])
-
   if (authLoading) {
     return (
       <DashboardLayout>
@@ -120,24 +98,27 @@ export default function BillingPage() {
     return null
   }
 
-  // DUAL FORMULA SYSTEM:
-  // GPS-based: Total Cost = Distance × ₱50/km
-  // Manual: Total Cost = Trip Count × Price Per Unit × Volume
-  const calculateTotalCost = (tripCount: number, pricePerUnit: number, volume: number) => {
+  // SEPARATE BILLING AND PAYROLL FORMULAS:
+  // Billing: Total Cost = Trip Count × Price Per Unit × Volume
+  // Payroll: Based on trip count tiers (1-2: ×400, 3: ×500, 4+: ×625)
+  const calculateBillingCost = (tripCount: number, pricePerUnit: number, volume: number) => {
     return tripCount * pricePerUnit * volume
   }
 
-  const calculateGPSCost = (distance: number) => {
-    return distance * 50 // ₱50 per kilometer
+  const calculatePayrollCost = (tripCount: number) => {
+    if (tripCount <= 0) return 0
+    if (tripCount <= 2) return tripCount * 400
+    if (tripCount === 3) return tripCount * 500
+    return tripCount * 625 // 4 or more trips
   }
 
-  const currentTotal = useGPSCalculation && gpsDistance > 0
-    ? calculateGPSCost(gpsDistance)
-    : calculateTotalCost(
-        Number(tripInputs.tripCount) || 0,
-        Number(tripInputs.pricePerUnit) || 0,
-        Number(tripInputs.volume) || 0,
-      )
+  const billingTotal = calculateBillingCost(
+    Number(tripInputs.tripCount) || 0,
+    Number(tripInputs.pricePerUnit) || 0,
+    Number(tripInputs.volume) || 0,
+  )
+  
+  const payrollTotal = calculatePayrollCost(Number(tripInputs.tripCount) || 0)
 
   const generateReceipt = async () => {
     if (!tripInputs.driverName || !tripInputs.truckNumber || tripInputs.tripCount === 0) {
@@ -158,7 +139,8 @@ export default function BillingPage() {
         trip_count: Number(tripInputs.tripCount) || 0,
         price_per_unit: Number(tripInputs.pricePerUnit) || 0,
         volume: Number(tripInputs.volume) || 0,
-        total_cost: currentTotal,
+        total_cost: billingTotal,
+        payroll_cost: payrollTotal,
         site_id: tripInputs.siteId || undefined,
         site_name: tripInputs.siteName || undefined,
         unit_type: tripInputs.unitType,
@@ -187,12 +169,16 @@ export default function BillingPage() {
   }
 
   const printReceipt = (record: any) => {
+    const tripCount = record.trip_count
+    const payrollRate = tripCount <= 2 ? 400 : tripCount === 3 ? 500 : 625
+    const payrollTier = tripCount <= 2 ? '1-2 trips' : tripCount === 3 ? '3 trips' : '4+ trips'
+    
     const printWindow = window.open("", "", "height=600,width=800")
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Payroll Receipt</title>
+            <title>Billing & Payroll Receipt</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
               .receipt { background: white; padding: 30px; border-radius: 8px; max-width: 600px; margin: auto; }
@@ -208,19 +194,21 @@ export default function BillingPage() {
               .breakdown-item { display: flex; justify-content: space-between; margin: 8px 0; font-size: 13px; color: #555; }
               .formula { background: #e3f2fd; padding: 12px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #2196f3; }
               .formula-text { font-family: monospace; font-size: 14px; color: #1565c0; }
-              .total-section { background: linear-gradient(to right, #1a1a1a, #2a2a2a); color: white; padding: 20px; border-radius: 6px; }
+              .billing-section { background: linear-gradient(to right, #2196f3, #1976d2); color: white; padding: 20px; border-radius: 6px; margin-bottom: 15px; }
+              .payroll-section { background: linear-gradient(to right, #4caf50, #388e3c); color: white; padding: 20px; border-radius: 6px; }
               .total-label { font-size: 16px; font-weight: bold; }
               .total-amount { font-size: 28px; font-weight: bold; }
               .total-row { display: flex; justify-content: space-between; align-items: center; }
               .divider { border-bottom: 1px solid #ddd; margin: 15px 0; }
               .footer { text-align: center; font-size: 11px; color: #999; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 15px; }
+              .tier-info { font-size: 11px; opacity: 0.9; margin-top: 5px; }
             </style>
           </head>
           <body>
             <div class="receipt">
               <div class="header">
                 <div class="title">EcoHaul</div>
-                <div class="subtitle">Payroll Receipt</div>
+                <div class="subtitle">Billing & Payroll Receipt</div>
               </div>
 
               <div class="section">
@@ -265,21 +253,40 @@ export default function BillingPage() {
               </div>
 
               <div class="formula">
-                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">CALCULATION FORMULA:</div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">BILLING CALCULATION:</div>
                 <div class="formula-text">
                   ${record.trip_count} trips × ₱${Number(record.price_per_unit).toLocaleString()} × ${Number(record.volume).toFixed(2)} ${record.unit_type || 'CBM'}
                 </div>
               </div>
 
-              <div class="total-section">
+              <div class="billing-section">
                 <div class="total-row">
-                  <span class="total-label">TOTAL PAYROLL</span>
+                  <span class="total-label">TOTAL BILLING</span>
                   <span class="total-amount">₱${Number(record.total_cost).toLocaleString()}</span>
                 </div>
               </div>
 
+              <div class="divider"></div>
+
+              <div class="formula">
+                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">PAYROLL CALCULATION:</div>
+                <div class="formula-text">
+                  ${tripCount} trips × ₱${payrollRate} = ₱${(record.payroll_cost || 0).toLocaleString()}
+                </div>
+                <div class="tier-info" style="color: #666; font-size: 11px; margin-top: 5px;">
+                  Tier: ${payrollTier} (₱${payrollRate} per trip)
+                </div>
+              </div>
+
+              <div class="payroll-section">
+                <div class="total-row">
+                  <span class="total-label">TOTAL PAYROLL</span>
+                  <span class="total-amount">₱${(record.payroll_cost || 0).toLocaleString()}</span>
+                </div>
+              </div>
+
               <div class="footer">
-                <p>This is an official payroll receipt. Please keep for your records.</p>
+                <p>This is an official billing and payroll receipt. Please keep for your records.</p>
                 <p>EcoHaul Mining Operations | ${new Date().getFullYear()}</p>
               </div>
             </div>
@@ -292,8 +299,20 @@ export default function BillingPage() {
   }
 
   const exportToExcel = () => {
-    // Create CSV content
-    const headers = ["Driver Name", "Truck Number", "Date", "Site", "Trips", "Price/Unit", "Volume", "Unit Type", "Total Cost (₱)"]
+    // Create CSV content with separate billing and payroll columns
+    const headers = [
+      "Driver Name",
+      "Truck Number",
+      "Date",
+      "Site",
+      "Trips",
+      "Price/Unit",
+      "Volume",
+      "Unit Type",
+      "Billing Cost (₱)",
+      "Payroll Cost (₱)"
+    ]
+    
     const rows = records.map((record) => [
       record.driver_name,
       record.truck_number || "N/A",
@@ -304,6 +323,7 @@ export default function BillingPage() {
       record.volume,
       record.unit_type || "CBM",
       record.total_cost,
+      record.payroll_cost || 0,
     ])
 
     const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
@@ -313,7 +333,7 @@ export default function BillingPage() {
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `driver-payroll-${new Date().toISOString().split("T")[0]}.csv`)
+    link.setAttribute("download", `billing-payroll-${new Date().toISOString().split("T")[0]}.csv`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
@@ -341,28 +361,22 @@ export default function BillingPage() {
     <DashboardLayout>
       <div className="space-y-8">
         {/* Page Header */}
-        <div className="border-b border-border pb-6">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Payroll & Billing</h1>
-          <p className="text-muted-foreground text-lg">Calculate payroll based on: Trips × Price/Unit × Volume (CBM/TON)</p>
-          <div className="mt-3 flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-            <div className="text-sm text-blue-900 dark:text-blue-200">
-              <p className="font-semibold mb-1">Formula: TOTAL COST = TRIPS × PRICE/UNIT × VOLUME</p>
-              <p className="text-xs">Volume is automatically calculated as 95% of truck dump box capacity (5% reduction factor)</p>
-            </div>
-          </div>
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-wide text-primary font-semibold">Operations management</p>
+          <h1 className="text-3xl font-bold text-foreground">Billing & Payroll</h1>
+          <p className="text-muted-foreground">Separate calculation for client billing and driver payroll</p>
         </div>
 
-        {/* Trip Input Section */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold">
+        {/* 1. Trip Input Section */}
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="border-b border-border/60 bg-card/50">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary font-bold text-lg">
                 1
               </div>
               <div>
-                <CardTitle>Input Trip Details</CardTitle>
-                <CardDescription>Select truck, site, and enter number of trips</CardDescription>
+                <CardTitle className="text-xl">Input Trip Data</CardTitle>
+                <CardDescription>Select driver, truck, site and enter trip count</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -525,205 +539,134 @@ export default function BillingPage() {
           </CardContent>
         </Card>
 
-        {/* Calculation and Generate Section */}
-        <Card className="border-2 border-accent bg-gradient-to-br from-card to-card/80">
-          <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground font-bold">
+        {/* 2. Billing Calculation Section */}
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="border-b border-border/60 bg-card/50">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-lg">
                 2
               </div>
-              <div>
-                <CardTitle>Payroll Calculation</CardTitle>
-                <CardDescription>
-                  {useGPSCalculation && gpsDistance > 0 
-                    ? '📍 GPS Formula: Distance (km) × ₱50/km' 
-                    : `Formula: Trips × Price/${tripInputs.unitType} × Volume`}
-                </CardDescription>
+              <div className="flex-1">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  Billing Calculation
+                  <span className="text-xs font-normal text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-1 rounded-md">Client Billing</span>
+                </CardTitle>
+                <CardDescription>Formula: Trips × Price/{tripInputs.unitType} × Volume</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* GPS Distance Display & Toggle */}
-            {gpsDistance > 0 && (
-              <div className="p-4 rounded-lg bg-green-500/10 border-2 border-green-500/30 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="text-2xl">📍</div>
-                    <div>
-                      <div className="text-sm font-semibold text-green-700 dark:text-green-400">GPS Data Available</div>
-                      <div className="text-xs text-muted-foreground">Automatically tracked distance from trips</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-600 dark:text-green-400">{gpsDistance.toFixed(2)} km</div>
-                      <div className="text-xs text-muted-foreground">Total Distance</div>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={useGPSCalculation}
-                        onChange={(e) => setUseGPSCalculation(e.target.checked)}
-                        className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
-                      />
-                      <span className="text-sm font-medium text-foreground">Use GPS</span>
-                    </label>
-                  </div>
-                </div>
-                {useGPSCalculation && (
-                  <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded">
-                    <Info size={14} />
-                    <span>GPS-based calculation: {gpsDistance.toFixed(2)} km × ₱50 = ₱{calculateGPSCost(gpsDistance).toLocaleString()}</span>
-                  </div>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg border border-border/60 bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Trips</div>
+                <div className="text-2xl font-bold text-foreground">{tripInputs.tripCount}</div>
               </div>
-            )}
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center p-4 rounded-lg bg-background/50 border border-border">
-                <div>
-                  <div className="text-sm font-medium text-foreground">Number of Trips</div>
-                  <div className="text-xs text-muted-foreground mt-1">Total trips completed</div>
-                </div>
-                <span className="text-2xl font-bold text-foreground">{tripInputs.tripCount}</span>
+              <div className="p-4 rounded-lg border border-border/60 bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Price/{tripInputs.unitType}</div>
+                <div className="text-2xl font-bold text-foreground">₱{tripInputs.pricePerUnit.toLocaleString()}</div>
               </div>
-
-              <div className="flex justify-between items-center p-4 rounded-lg bg-background/50 border border-border">
-                <div>
-                  <div className="text-sm font-medium text-foreground">Price per {tripInputs.unitType}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Rate per unit volume</div>
-                </div>
-                <span className="text-2xl font-bold text-accent">₱{tripInputs.pricePerUnit.toLocaleString()}</span>
+              <div className="p-4 rounded-lg border border-border/60 bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Volume ({tripInputs.unitType})</div>
+                <div className="text-2xl font-bold text-foreground">{tripInputs.volume.toFixed(2)}</div>
               </div>
+            </div>
 
-              <div className="flex justify-between items-center p-4 rounded-lg bg-background/50 border border-border">
-                <div>
-                  <div className="text-sm font-medium text-foreground">Volume ({tripInputs.unitType})</div>
-                  <div className="text-xs text-muted-foreground mt-1">Net capacity (95% of dump box)</div>
-                </div>
-                <span className="text-2xl font-bold text-accent">{tripInputs.volume.toFixed(2)}</span>
+            <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+              <div className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide font-semibold mb-2">Formula</div>
+              <div className="text-sm text-foreground">
+                {tripInputs.tripCount} × ₱{tripInputs.pricePerUnit} × {tripInputs.volume.toFixed(2)} = ₱{billingTotal.toLocaleString()}
               </div>
+            </div>
 
-              <div className="border-t-2 border-dashed border-border pt-4 my-4"></div>
+            <div className="flex justify-between items-center p-6 rounded-lg bg-blue-600/10 border-2 border-blue-600/30">
+              <span className="text-base font-semibold text-foreground">Total Billing Cost</span>
+              <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">₱{billingTotal.toLocaleString()}</span>
+            </div>
+          </CardContent>
+        </Card>
 
-              <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-muted-foreground">Calculation</span>
-                </div>
-                <div className="text-sm font-mono text-foreground mb-3">
-                  {useGPSCalculation && gpsDistance > 0
-                    ? `${gpsDistance.toFixed(2)} km × ₱50/km`
-                    : `${tripInputs.tripCount} trips × ₱${tripInputs.pricePerUnit} × ${tripInputs.volume.toFixed(2)} ${tripInputs.unitType}`
-                  }
+        {/* 3. Payroll Calculation Section */}
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="border-b border-border/60 bg-card/50">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 font-bold text-lg">
+                3
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  Payroll Calculation
+                  <span className="text-xs font-normal text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-md">Driver Payment</span>
+                </CardTitle>
+                <CardDescription>Formula: Trips × Rate (tier-based)</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg border border-border/60 bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Trips</div>
+                <div className="text-2xl font-bold text-foreground">{tripInputs.tripCount}</div>
+              </div>
+              <div className="p-4 rounded-lg border border-border/60 bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Rate/Trip</div>
+                <div className="text-2xl font-bold text-foreground">
+                  ₱{tripInputs.tripCount <= 2 ? '400' : tripInputs.tripCount === 3 ? '500' : '625'}
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-border pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-foreground">Total Payroll</span>
-                <span className="text-4xl font-bold text-accent">₱{currentTotal.toLocaleString()}</span>
+            {/* Tier Pricing Breakdown */}
+            <div className="p-4 rounded-lg bg-muted/30 border border-border/60">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-3">Rate Tiers</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className={`p-3 rounded-lg border ${tripInputs.tripCount > 0 && tripInputs.tripCount <= 2 ? 'bg-green-500/10 border-green-500/30' : 'bg-background border-border/60'}`}>
+                  <div className="text-xs text-muted-foreground mb-1">1-2 trips</div>
+                  <div className="text-lg font-bold text-foreground">₱400<span className="text-xs font-normal text-muted-foreground">/trip</span></div>
+                </div>
+                <div className={`p-3 rounded-lg border ${tripInputs.tripCount === 3 ? 'bg-green-500/10 border-green-500/30' : 'bg-background border-border/60'}`}>
+                  <div className="text-xs text-muted-foreground mb-1">3 trips</div>
+                  <div className="text-lg font-bold text-foreground">₱500<span className="text-xs font-normal text-muted-foreground">/trip</span></div>
+                </div>
+                <div className={`p-3 rounded-lg border ${tripInputs.tripCount >= 4 ? 'bg-green-500/10 border-green-500/30' : 'bg-background border-border/60'}`}>
+                  <div className="text-xs text-muted-foreground mb-1">4+ trips</div>
+                  <div className="text-lg font-bold text-foreground">₱625<span className="text-xs font-normal text-muted-foreground">/trip</span></div>
+                </div>
               </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide font-semibold">Formula</div>
+                <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                  Tier: {tripInputs.tripCount <= 2 ? '1-2 trips' : tripInputs.tripCount === 3 ? '3 trips' : '4+ trips'}
+                </div>
+              </div>
+              <div className="text-sm text-foreground">
+                {tripInputs.tripCount <= 0 
+                  ? 'No trips' 
+                  : tripInputs.tripCount <= 2 
+                    ? `${tripInputs.tripCount} × ₱400 = ₱${payrollTotal.toLocaleString()}` 
+                    : tripInputs.tripCount === 3 
+                      ? `${tripInputs.tripCount} × ₱500 = ₱${payrollTotal.toLocaleString()}` 
+                      : `${tripInputs.tripCount} × ₱625 = ₱${payrollTotal.toLocaleString()}`
+                }
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center p-6 rounded-lg bg-green-600/10 border-2 border-green-600/30">
+              <span className="text-base font-semibold text-foreground">Total Payroll Cost</span>
+              <span className="text-3xl font-bold text-green-600 dark:text-green-400">₱{payrollTotal.toLocaleString()}</span>
             </div>
 
             <Button
               onClick={generateReceipt}
               disabled={isSaving}
               size="lg"
-              className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold text-base"
+              className="w-full bg-primary hover:bg-primary/90 font-semibold"
             >
               <Download size={18} className="mr-2" />
-              {isSaving ? "Saving..." : "Save to Payroll History"}
+              {isSaving ? "Saving..." : "Save Billing & Payroll Record"}
             </Button>
-          </CardContent>
-        </Card>
-
-        {/* GPS-Based Earnings Summary */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20 text-green-600 font-bold">
-                📍
-              </div>
-              <div>
-                <CardTitle>GPS-Based Earnings</CardTitle>
-                <CardDescription>Calculated from automatically recorded trip distances</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {tripsLoading ? (
-                <Skeleton className="h-20 w-full" />
-              ) : trips && trips.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-lg bg-background/50 border border-border">
-                      <div className="text-sm text-muted-foreground mb-1">Total Trips</div>
-                      <div className="text-2xl font-bold text-foreground">{trips.length}</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-background/50 border border-border">
-                      <div className="text-sm text-muted-foreground mb-1">Total Distance</div>
-                      <div className="text-2xl font-bold text-foreground">
-                        {trips.reduce((sum, trip) => sum + (trip.distance || 0), 0).toFixed(2)} km
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-background/50 border border-border">
-                      <div className="text-sm text-muted-foreground mb-1">Rate per km</div>
-                      <div className="text-2xl font-bold text-accent">₱50</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary">
-                      <div className="text-sm text-muted-foreground mb-1">Total Earnings</div>
-                      <div className="text-2xl font-bold text-primary">
-                        ₱{(trips.reduce((sum, trip) => sum + ((trip.distance || 0) * 50), 0)).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Trip breakdown table */}
-                  <div className="border-t border-border pt-4 mt-4">
-                    <h3 className="font-semibold text-foreground mb-3">Trip Breakdown</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="border-b border-border">
-                          <tr className="text-muted-foreground">
-                            <th className="text-left py-2">Trip ID</th>
-                            <th className="text-left py-2">Driver</th>
-                            <th className="text-right py-2">Distance (km)</th>
-                            <th className="text-right py-2">Cost (₱50/km)</th>
-                            <th className="text-left py-2">Duration</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {trips.slice(0, 10).map((trip) => (
-                            <tr key={trip.id} className="border-b border-border hover:bg-background/50">
-                              <td className="py-2 text-foreground">#{String(trip.id).slice(0, 8)}</td>
-                              <td className="py-2 text-foreground">{trip.driver_name || 'Unknown'}</td>
-                              <td className="py-2 text-right text-foreground">{(trip.distance || 0).toFixed(2)}</td>
-                              <td className="py-2 text-right font-semibold text-accent">
-                                ₱{((trip.distance || 0) * 50).toLocaleString()}
-                              </td>
-                              <td className="py-2 text-muted-foreground text-xs">{trip.duration || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {trips.length > 10 && (
-                      <div className="text-center text-xs text-muted-foreground mt-2">
-                        ... and {trips.length - 10} more trips
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="text-4xl mb-2">📍</div>
-                  <p className="text-muted-foreground">No GPS trips recorded yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Drivers need to complete trips with GPS tracking to generate earnings</p>
-                </div>
-              )}
-            </div>
           </CardContent>
         </Card>
 
@@ -840,9 +783,14 @@ export default function BillingPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-sm text-muted-foreground">Total Payroll</div>
-                            <div className="text-2xl font-bold text-accent">₱{record.total_cost.toLocaleString()}</div>
+                          <div className="text-right space-y-1">
+                            <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">Billing</div>
+                            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">₱{record.total_cost.toLocaleString()}</div>
+                          </div>
+                          <div className="h-12 w-px bg-border"></div>
+                          <div className="text-right space-y-1">
+                            <div className="text-xs text-green-600 dark:text-green-400 font-medium">Payroll</div>
+                            <div className="text-xl font-bold text-green-600 dark:text-green-400">₱{(record.payroll_cost || 0).toLocaleString()}</div>
                           </div>
                           <Button
                             onClick={() => printReceipt(record)}

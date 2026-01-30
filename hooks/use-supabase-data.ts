@@ -186,6 +186,23 @@ export async function createDriverTrip({
 
   // No active trip exists, create new trip
   console.log('Creating new trip')
+  
+  // Generate receipt number: Get today's trip count for this truck to create sequential number
+  const { data: todayTruckTrips, error: countError } = await supabase
+    .from('trips')
+    .select('id')
+    .eq('truck_id', truckId)
+    .eq('date', today)
+  
+  if (countError) {
+    console.error('Error counting trips:', countError)
+  }
+  
+  // Generate receipt number in format: RCP-{truck_number}-{sequential}
+  const tripSequence = (todayTruckTrips?.length || 0) + 1
+  const receiptNumber = `RCP-${truckNumber.replace(/[^0-9]/g, '').padStart(3, '0')}-${String(tripSequence).padStart(3, '0')}`
+  console.log('Generated receipt number:', receiptNumber)
+  
   const { data, error } = await supabase
     .from('trips')
     .insert([
@@ -195,6 +212,7 @@ export async function createDriverTrip({
         driver_name: driverName,
         truck_id: truckId,
         truck_number: truckNumber,
+        driver_receipt_number: receiptNumber,
         start_time: now,
         end_time: now, // Same as start means active
         distance: 0,

@@ -45,19 +45,19 @@ UPDATE drivers SET truck_id = 4, truck_number = 'T-004' WHERE id = 4;
 UPDATE drivers SET truck_id = 5, truck_number = 'T-005' WHERE id = 5;
 
 -- Insert Sample Trips (Today) - Leave commented so today starts at 0
--- INSERT INTO trips (date, truck_id, truck_number, driver_id, driver_name, start_time, end_time, distance, duration, cost) VALUES
--- (CURRENT_DATE, 1, 'T-001', 1, 'John Reyes', '06:00 AM', '08:15 AM', 45.2, '2h 15m', '₱2,260'),
--- (CURRENT_DATE, 3, 'T-003', 2, 'Maria Santos', '06:30 AM', '08:28 AM', 38.7, '1h 58m', '₱1,935'),
--- (CURRENT_DATE, 2, 'T-002', 3, 'Carlos Mendoza', '07:15 AM', '09:57 AM', 52.1, '2h 42m', '₱2,605');
+-- INSERT INTO trips (date, truck_id, truck_number, driver_id, driver_name, driver_receipt_number, start_time, end_time, distance, duration, cost) VALUES
+-- (CURRENT_DATE, 1, 'T-001', 1, 'John Reyes', 'RCP-001-001', '06:00 AM', '08:15 AM', 45.2, '2h 15m', '₱2,260'),
+-- (CURRENT_DATE, 3, 'T-003', 2, 'Maria Santos', 'RCP-003-001', '06:30 AM', '08:28 AM', 38.7, '1h 58m', '₱1,935'),
+-- (CURRENT_DATE, 2, 'T-002', 3, 'Carlos Mendoza', 'RCP-002-001', '07:15 AM', '09:57 AM', 52.1, '2h 42m', '₱2,605');
 
 -- Insert Additional Trips for Today (Different times)
--- INSERT INTO trips (date, truck_id, truck_number, driver_id, driver_name, start_time, end_time, distance, duration, cost) VALUES
--- (CURRENT_DATE, 5, 'T-005', 5, 'Anna Cruz', '08:00 AM', '10:05 AM', 41.5, '2h 05m', '₱2,075'),
--- (CURRENT_DATE, 4, 'T-004', 4, 'Juan Dela Cruz', '08:30 AM', '10:22 AM', 36.9, '1h 52m', '₱1,845'),
--- (CURRENT_DATE, 1, 'T-001', 1, 'John Reyes', '10:30 AM', '12:45 PM', 48.3, '2h 15m', '₱2,415'),
--- (CURRENT_DATE, 2, 'T-002', 3, 'Carlos Mendoza', '11:00 AM', '01:20 PM', 42.8, '2h 20m', '₱2,140'),
--- (CURRENT_DATE, 3, 'T-003', 2, 'Maria Santos', '01:45 PM', '03:55 PM', 51.2, '2h 10m', '₱2,560'),
--- (CURRENT_DATE, 5, 'T-005', 5, 'Anna Cruz', '02:00 PM', '04:25 PM', 46.7, '2h 25m', '₱2,335');
+-- INSERT INTO trips (date, truck_id, truck_number, driver_id, driver_name, driver_receipt_number, start_time, end_time, distance, duration, cost) VALUES
+-- (CURRENT_DATE, 5, 'T-005', 5, 'Anna Cruz', 'RCP-005-001', '08:00 AM', '10:05 AM', 41.5, '2h 05m', '₱2,075'),
+-- (CURRENT_DATE, 4, 'T-004', 4, 'Juan Dela Cruz', 'RCP-004-001', '08:30 AM', '10:22 AM', 36.9, '1h 52m', '₱1,845'),
+-- (CURRENT_DATE, 1, 'T-001', 1, 'John Reyes', 'RCP-001-002', '10:30 AM', '12:45 PM', 48.3, '2h 15m', '₱2,415'),
+-- (CURRENT_DATE, 2, 'T-002', 3, 'Carlos Mendoza', 'RCP-002-002', '11:00 AM', '01:20 PM', 42.8, '2h 20m', '₱2,140'),
+-- (CURRENT_DATE, 3, 'T-003', 2, 'Maria Santos', 'RCP-003-002', '01:45 PM', '03:55 PM', 51.2, '2h 10m', '₱2,560'),
+-- (CURRENT_DATE, 5, 'T-005', 5, 'Anna Cruz', 'RCP-005-002', '02:00 PM', '04:25 PM', 46.7, '2h 25m', '₱2,335');
 
 -- Insert Historical Trips (Past 7 days for chart data)
 -- Each day gets varying trip counts for realistic data
@@ -66,18 +66,24 @@ DECLARE
   day_offset INTEGER;
   trip_count INTEGER;
   i INTEGER;
+  truck_num INTEGER;
+  driver_id_val INTEGER;
 BEGIN
   FOR day_offset IN 1..6 LOOP
     trip_count := 3 + (RANDOM() * 5)::INTEGER;
     
     FOR i IN 1..trip_count LOOP
-      INSERT INTO trips (date, truck_id, truck_number, driver_id, driver_name, start_time, end_time, distance, duration, cost)
+      truck_num := 1 + (RANDOM() * 5)::INTEGER;
+      driver_id_val := 1 + (RANDOM() * 4)::INTEGER;
+      
+      INSERT INTO trips (date, truck_id, truck_number, driver_id, driver_name, driver_receipt_number, start_time, end_time, distance, duration, cost)
       VALUES (
         CURRENT_DATE - (day_offset || ' days')::INTERVAL,
-        1 + (RANDOM() * 4)::INTEGER,
-        'T-00' || (1 + (RANDOM() * 5)::INTEGER),
-        1 + (RANDOM() * 4)::INTEGER,
-        (ARRAY['John Reyes', 'Maria Santos', 'Carlos Mendoza', 'Anna Cruz', 'Juan Dela Cruz'])[1 + (RANDOM() * 4)::INTEGER],
+        truck_num,
+        'T-00' || truck_num,
+        driver_id_val,
+        (ARRAY['John Reyes', 'Maria Santos', 'Carlos Mendoza', 'Anna Cruz', 'Juan Dela Cruz'])[driver_id_val],
+        'RCP-' || LPAD(truck_num::TEXT, 3, '0') || '-' || LPAD((day_offset * 10 + i)::TEXT, 3, '0'),
         '06:00 AM',
         '08:00 AM',
         30 + (RANDOM() * 40)::NUMERIC(10,2),
@@ -104,12 +110,12 @@ INSERT INTO compliance_checks (site, truck_id, truck_number, last_check, status,
 ('Mining Site B', 6, 'T-006', NOW() - INTERVAL '3 days', 'Needs Review', 'Requires follow-up inspection');
 
 -- Insert Payroll Records
-INSERT INTO payroll_records (driver_id, driver_name, date, distance, tonnage, trip_count, total_cost) VALUES
-(1, 'John Reyes', CURRENT_DATE - INTERVAL '1 day', 250, 15, 5, 15500),
-(2, 'Maria Santos', CURRENT_DATE - INTERVAL '1 day', 180, 12, 4, 11400),
-(3, 'Carlos Mendoza', CURRENT_DATE - INTERVAL '2 days', 220, 14, 4, 14200),
-(5, 'Anna Cruz', CURRENT_DATE - INTERVAL '2 days', 195, 13, 4, 12350),
-(1, 'John Reyes', CURRENT_DATE - INTERVAL '3 days', 275, 16, 5, 16450);
+INSERT INTO payroll_records (driver_id, driver_name, date, trip_count, total_cost) VALUES
+(1, 'John Reyes', CURRENT_DATE - INTERVAL '1 day', 5, 15500),
+(2, 'Maria Santos', CURRENT_DATE - INTERVAL '1 day', 4, 11400),
+(3, 'Carlos Mendoza', CURRENT_DATE - INTERVAL '2 days', 4, 14200),
+(5, 'Anna Cruz', CURRENT_DATE - INTERVAL '2 days', 4, 12350),
+(1, 'John Reyes', CURRENT_DATE - INTERVAL '3 days', 5, 16450);
 
 -- Success message
 DO $$

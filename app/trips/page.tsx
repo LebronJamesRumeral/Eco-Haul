@@ -40,6 +40,7 @@ export default function TripsPage() {
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [truckNumber, setTruckNumber] = useState("")
   const [driverName, setDriverName] = useState("")
+  const [receiptNumber, setReceiptNumber] = useState("")
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [distance, setDistance] = useState<number>(0)
@@ -109,6 +110,10 @@ export default function TripsPage() {
                     <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
                   </div>
                   <div>
+                    <Label>Receipt #</Label>
+                    <Input placeholder="RCP-001-001" value={receiptNumber} onChange={(e) => setReceiptNumber(e.target.value)} />
+                  </div>
+                  <div>
                     <Label>Start Time</Label>
                     <Input placeholder="06:00 AM" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
                   </div>
@@ -131,10 +136,28 @@ export default function TripsPage() {
                 <div className="flex items-end">
                   <Button
                     onClick={async () => {
-                      if (!truckNumber || !driverName || !startTime || !endTime) return
-                      await createTrip({ date, truck_id: null as any, truck_number: truckNumber, driver_id: null as any, driver_name: driverName, start_time: startTime, end_time: endTime, distance, duration, cost })
+                      // Validate all 4 required fields
+                      if (!truckNumber || !driverName || !receiptNumber || !date) {
+                        alert("Please fill in all required fields: Truck, Driver, Receipt Number, and Date")
+                        return
+                      }
+                      await createTrip({ 
+                        date, 
+                        truck_id: null as any, 
+                        truck_number: truckNumber, 
+                        driver_id: null as any, 
+                        driver_name: driverName,
+                        driver_receipt_number: receiptNumber,
+                        start_time: startTime, 
+                        end_time: endTime, 
+                        distance, 
+                        duration, 
+                        cost 
+                      })
+                      // Reset form
                       setTruckNumber("")
                       setDriverName("")
+                      setReceiptNumber("")
                       setStartTime("")
                       setEndTime("")
                       setDistance(0)
@@ -156,6 +179,7 @@ export default function TripsPage() {
                     <TableHead className="text-foreground">Date</TableHead>
                     {!isDriver && <TableHead className="text-foreground">Truck</TableHead>}
                     {!isDriver && <TableHead className="text-foreground">Driver</TableHead>}
+                    <TableHead className="text-foreground">Receipt #</TableHead>
                     <TableHead className="text-foreground">Start Time</TableHead>
                     <TableHead className="text-foreground">End Time</TableHead>
                     <TableHead className="text-right text-foreground">Distance (km)</TableHead>
@@ -170,6 +194,7 @@ export default function TripsPage() {
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                         {!isDriver && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
                         {!isDriver && <TableCell><Skeleton className="h-4 w-32" /></TableCell>}
+                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
@@ -179,7 +204,7 @@ export default function TripsPage() {
                     ))
                   ) : displayedTrips.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isDriver ? 5 : 8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={isDriver ? 6 : 9} className="text-center text-muted-foreground py-8">
                         {isDriver ? "No trips yet" : "No trips found"}
                       </TableCell>
                     </TableRow>
@@ -189,6 +214,7 @@ export default function TripsPage() {
                         <TableCell className="font-medium text-foreground">{trip.date}</TableCell>
                         {!isDriver && <TableCell className="text-foreground">{trip.truck_number}</TableCell>}
                         {!isDriver && <TableCell className="text-foreground">{trip.driver_name}</TableCell>}
+                        <TableCell className="text-foreground">{trip.driver_receipt_number || 'N/A'}</TableCell>
                         <TableCell className="text-foreground">{trip.start_time}</TableCell>
                         <TableCell className="text-foreground">{trip.end_time}</TableCell>
                         <TableCell className="text-right text-foreground">{trip.distance}</TableCell>

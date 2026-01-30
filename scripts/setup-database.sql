@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS trips (
   truck_number TEXT NOT NULL,
   driver_id BIGINT REFERENCES drivers(id),
   driver_name TEXT NOT NULL,
+  driver_receipt_number TEXT,
   start_time TEXT NOT NULL,
   end_time TEXT NOT NULL,
   distance NUMERIC(10, 2) NOT NULL,

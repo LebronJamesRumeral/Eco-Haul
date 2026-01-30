@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useDashboardStats, useTrips, useChartData, useDrivers, useTrucks, useAutoGenerateTrips } from '@/hooks/use-supabase-data'
+import { useTrips, useChartData, useDrivers, useTrucks, useAutoGenerateTrips } from '@/hooks/use-supabase-data'
 import { useAuth } from '@/hooks/use-auth'
 import { Skeleton } from '@/components/ui/skeleton'
 import { logout } from '@/lib/auth'
@@ -16,15 +16,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, loading: authLoading, isAdmin } = useAuth()
-  const { stats, loading: statsLoading } = useDashboardStats()
   const { trips, loading: tripsLoading } = useTrips()
   const { tripsPerDay, distancePerTruck, loading: chartLoading } = useChartData()
   const { drivers } = useDrivers()
   const { trucks } = useTrucks()
   // Auto-generate trips from GPS data
-  const { lastGenerated } = useAutoGenerateTrips()
+  useAutoGenerateTrips()
   const today = new Date().toISOString().split('T')[0]
-  const [selectedDate, setSelectedDate] = useState(today)
+  const [startDate, setStartDate] = useState(today)
+  const [endDate, setEndDate] = useState(today)
+  const [singleDate, setSingleDate] = useState(today)
+  const [dateMode, setDateMode] = useState<'range' | 'single' | 'all'>('range')
   const [selectedDriver, setSelectedDriver] = useState<string>('all')
   const [selectedTruck, setSelectedTruck] = useState<string>('all')
   const [detailTruck, setDetailTruck] = useState<string>('')
@@ -52,8 +54,36 @@ export default function AdminDashboard() {
     router.push('/login')
   }
   
+  const normalizedRangeStart = startDate && endDate && startDate <= endDate ? startDate : endDate
+  const normalizedRangeEnd = startDate && endDate && startDate <= endDate ? endDate : startDate
+  const formatDateLabel = (value: string) => {
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return value
+    return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+  const rangeLabel = dateMode === 'all'
+    ? 'All dates'
+    : dateMode === 'single'
+      ? formatDateLabel(singleDate)
+      : normalizedRangeStart === normalizedRangeEnd
+        ? formatDateLabel(normalizedRangeStart)
+        : `${formatDateLabel(normalizedRangeStart)} - ${formatDateLabel(normalizedRangeEnd)}`
+
   const filteredTrips = trips.filter((trip) => {
-    const matchesDate = trip.date === selectedDate
+    // Validate trip has all 4 required fields
+    const hasRequiredFields = 
+      trip.truck_number && 
+      trip.date && 
+      trip.driver_name && 
+      trip.driver_receipt_number
+    
+    if (!hasRequiredFields) return false
+    
+    const matchesDate = dateMode === 'all'
+      ? true
+      : dateMode === 'single'
+        ? trip.date === singleDate
+        : trip.date >= normalizedRangeStart && trip.date <= normalizedRangeEnd
     const matchesDriver = selectedDriver === 'all' || trip.driver_name === selectedDriver
     const matchesTruck = selectedTruck === 'all' || trip.truck_number === selectedTruck
     return matchesDate && matchesDriver && matchesTruck
@@ -65,8 +95,18 @@ export default function AdminDashboard() {
     return sum + Number(parsed || 0)
   }, 0)
   const activeTrips = filteredTrips.filter((trip) => trip.start_time === trip.end_time).length
-  const uniqueTrucks = new Set(filteredTrips.map((t) => t.truck_number)).size
-  const uniqueDrivers = new Set(filteredTrips.map((t) => t.driver_name)).size
+  const validTruckNumbers = new Set(trucks.map((t) => t.truck_number).filter(Boolean))
+  const validDriverNames = new Set(drivers.map((d) => d.name).filter(Boolean))
+  const activeTrucksCount = new Set(
+    filteredTrips
+      .map((t) => t.truck_number)
+      .filter((truckNumber): truckNumber is string => Boolean(truckNumber) && validTruckNumbers.has(truckNumber))
+  ).size
+  const driversOnDutyCount = new Set(
+    filteredTrips
+      .map((t) => t.driver_name)
+      .filter((driverName): driverName is string => Boolean(driverName) && validDriverNames.has(driverName))
+  ).size
 
   const topTrucks = [...filteredTrips]
     .reduce<Record<string, { distance: number; trips: number; driver: string }>>((acc, trip) => {
@@ -112,25 +152,71 @@ export default function AdminDashboard() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-wide text-primary font-semibold">Operations overview</p>
             <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Monitor trucks, drivers, and trips with a date-aware snapshot.</p>
+            <p className="text-muted-foreground">Monitor trucks, drivers, and trips across any date range.</p>
           </div>
-          <div className="flex items-end gap-3 flex-wrap">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9"
-              />
+          <div className="w-full lg:w-auto">
+            <div className="rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-1">
+                <button
+                  type="button"
+                  onClick={() => setDateMode('range')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'range' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Date range
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateMode('single')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'single' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Single date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateMode('all')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  All dates
+                </button>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Range start</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    disabled={dateMode !== 'range'}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9 disabled:opacity-60"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Range end</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    disabled={dateMode !== 'range'}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9 disabled:opacity-60"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Single date</label>
+                  <input
+                    type="date"
+                    value={singleDate}
+                    onChange={(e) => setSingleDate(e.target.value)}
+                    disabled={dateMode !== 'single'}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9 disabled:opacity-60"
+                  />
+                </div>
+              </div>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
-              Logout
-            </Button>
           </div>
         </div>
 
@@ -182,8 +268,8 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Active Trucks</CardTitle>
             </CardHeader>
             <CardContent>
-              {statsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{stats?.active_trucks || 0}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Live status</p>
+              {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{activeTrucksCount}</div>}
+              <p className="text-xs text-muted-foreground mt-1">Based on {rangeLabel}</p>
             </CardContent>
           </Card>
 
@@ -192,18 +278,18 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Drivers On Duty</CardTitle>
             </CardHeader>
             <CardContent>
-              {statsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{stats?.drivers_on_duty || 0}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Currently assigned</p>
+              {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{driversOnDutyCount}</div>}
+              <p className="text-xs text-muted-foreground mt-1">Based on {rangeLabel}</p>
             </CardContent>
           </Card>
 
           <Card className="bg-card border-border/60">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Trips (date)</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Trips</CardTitle>
             </CardHeader>
             <CardContent>
               {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-accent">{filteredTrips.length}</div>}
-              <p className="text-xs text-muted-foreground mt-1">{selectedDate}</p>
+              <p className="text-xs text-muted-foreground mt-1">{rangeLabel}</p>
             </CardContent>
           </Card>
 
@@ -213,7 +299,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               {tripsLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold text-accent">{selectedDistance.toFixed(1)}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Total for date</p>
+              <p className="text-xs text-muted-foreground mt-1">Total for range</p>
             </CardContent>
           </Card>
 
@@ -223,7 +309,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               {tripsLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold text-accent">₱{selectedCost.toLocaleString()}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Payroll estimate</p>
+              <p className="text-xs text-muted-foreground mt-1">Payroll estimate for range</p>
             </CardContent>
           </Card>
 
@@ -238,70 +324,12 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Date Snapshot Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-card border-border/60">
-            <CardHeader>
-              <CardTitle>Unique Trucks ({uniqueTrucks})</CardTitle>
-              <CardDescription>Trucks that have trips on {selectedDate}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tripsLoading ? <Skeleton className="h-24 w-full" /> : (
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary grid place-items-center text-sm font-semibold">{uniqueTrucks}</div>
-                  <p>Distinct trucks logged trips on this date.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border/60">
-            <CardHeader>
-              <CardTitle>Unique Drivers ({uniqueDrivers})</CardTitle>
-              <CardDescription>Drivers that have trips on {selectedDate}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tripsLoading ? <Skeleton className="h-24 w-full" /> : (
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <div className="h-10 w-10 rounded-lg bg-accent/10 text-accent grid place-items-center text-sm font-semibold">{uniqueDrivers}</div>
-                  <p>Distinct drivers logged trips on this date.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border/60">
-            <CardHeader>
-              <CardTitle>Snapshot</CardTitle>
-              <CardDescription>Quick view of trucks, drivers, and trips for the selected date.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-3 text-sm">
-              {tripsLoading ? <Skeleton className="h-20 w-full col-span-3" /> : (
-                <>
-                  <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Trucks</p>
-                    <p className="text-lg font-semibold text-foreground">{uniqueTrucks}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Drivers</p>
-                    <p className="text-lg font-semibold text-foreground">{uniqueDrivers}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Trips</p>
-                    <p className="text-lg font-semibold text-foreground">{filteredTrips.length}</p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Rankings */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="bg-card border-border/60">
             <CardHeader>
               <CardTitle>Top Trucks</CardTitle>
-              <CardDescription>Ranked by distance on {selectedDate}</CardDescription>
+              <CardDescription>Ranked by distance for {rangeLabel}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {tripsLoading ? (
@@ -331,7 +359,7 @@ export default function AdminDashboard() {
           <Card className="bg-card border-border/60">
             <CardHeader>
               <CardTitle>Top Drivers</CardTitle>
-              <CardDescription>Ranked by trips on {selectedDate}</CardDescription>
+              <CardDescription>Ranked by trips for {rangeLabel}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {tripsLoading ? (
@@ -550,7 +578,7 @@ export default function AdminDashboard() {
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle>Recent Trips</CardTitle>
-            <CardDescription>Latest trip records from today</CardDescription>
+            <CardDescription>Latest trip records for {rangeLabel}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border border-border rounded-lg overflow-hidden">

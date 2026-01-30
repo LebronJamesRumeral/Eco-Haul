@@ -162,10 +162,10 @@ export default function GPSTrackingPage() {
           <CardContent>
             <div className="rounded-lg overflow-hidden border border-border/40">
               {isClient && (
-                <MapContainer center={mapCenter} zoom={12} style={{ height: '400px', width: '100%' }}>
+                <MapContainer center={mapCenter} zoom={11} style={{ height: '400px', width: '100%' }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
                   {activeLocations.map((loc) => (
-                    <Marker key={loc.id} position={[loc.latitude, loc.longitude]}>
+                    <Marker key={loc.driver_id} position={[loc.latitude, loc.longitude]}>
                       <Popup>
                         <div className="space-y-1">
                           <p className="font-semibold text-sm">{loc.driver_name}</p>
@@ -228,7 +228,7 @@ export default function GPSTrackingPage() {
                   {activeLocations.map((location) => {
                     const statusColor = getStatusColor(location.seconds_since_update, location.tracking_enabled)
                     return (
-                      <TableRow key={location.id}>
+                      <TableRow key={location.driver_id}>
                         <TableCell className="font-medium">{location.driver_name}</TableCell>
                         <TableCell>{location.truck_number || '-'}</TableCell>
                         <TableCell>
