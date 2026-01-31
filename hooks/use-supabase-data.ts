@@ -1100,24 +1100,25 @@ export function useGPSTracking() {
       if (!navigator.onLine) {
         try {
           const gpsQueue = JSON.parse(localStorage.getItem('gps_queue') || '[]')
+          const queuedLocation = {
+            driver_id: driverId,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            speed: position.coords.speed || null,
+            heading: position.coords.heading || null,
+            timestamp: new Date().toISOString(),
+            trip_id: tripId || null
+          }
           gpsQueue.push({
             id: `gps-${Date.now()}`,
             type: 'gps',
-            data: {
-              driver_id: driverId,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              speed: position.coords.speed || null,
-              heading: position.coords.heading || null,
-              timestamp: new Date().toISOString(),
-              trip_id: tripId || null
-            },
+            data: queuedLocation,
             timestamp: Date.now(),
             status: 'pending'
           })
           localStorage.setItem('gps_queue', JSON.stringify(gpsQueue))
-          console.log('GPS location queued for offline sync:', locationData)
+          console.log('GPS location queued for offline sync:', queuedLocation)
         } catch (queueErr) {
           console.error('Failed to queue GPS location:', queueErr)
         }

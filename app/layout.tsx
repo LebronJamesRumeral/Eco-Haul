@@ -5,7 +5,6 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { OfflineIndicator } from "@/components/offline-indicator"
-import { GPSSyncProvider } from "@/components/gps-sync-provider"
 import "./globals.css"
 
 const _geist = Inter({ 
@@ -74,7 +73,6 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <OfflineIndicator />
-          <GPSSyncProvider />
           {children}
           <PWAInstallPrompt />
           <Analytics />

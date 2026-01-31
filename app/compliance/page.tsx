@@ -18,7 +18,7 @@ import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 export default function CompliancePage() {
   const router = useRouter()
-  const { user, showLoading: authLoading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<string | undefined>(undefined)
   const [debounced, setDebounced] = useState("")
