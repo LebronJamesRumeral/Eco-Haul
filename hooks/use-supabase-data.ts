@@ -82,7 +82,7 @@ function calculateDurationFromTimestamps(startTime: string, endTime: string): st
 }
 
 // Create a manual trip entry for a driver (used when driver clicks "Start Trip")
-// If a trip is already active today (start_time === end_time), complete it
+// If a trip is already active today (end_time === null), complete it
 // Otherwise create new trip
 export async function createDriverTrip({
   driverId,
@@ -104,7 +104,7 @@ export async function createDriverTrip({
 
   console.log('Creating/completing trip for driver:', { driverId, driverName, today })
 
-  // Check if there's an active trip (start_time === end_time) for this driver today
+  // Check if there's an active trip (end_time === null) for this driver today
   const { data: existingTrips, error: fetchError } = await supabase
     .from('trips')
     .select('id, start_time, end_time')
@@ -119,35 +119,38 @@ export async function createDriverTrip({
 
   console.log('Existing trips found:', existingTrips?.length || 0)
 
-  // Find the active trip (where start_time === end_time)
-  const activeTrip = existingTrips?.find(t => t.start_time === t.end_time)
+  // Find the active trip (where end_time is null)
+  const activeTrip = existingTrips?.find(t => t.end_time === null)
   
   if (activeTrip) {
     console.log('Found active trip:', activeTrip)
-    // Trip is active, complete it by setting end_time to at least 1 minute after start_time
+    // Trip is active, complete it by setting end_time to current time
     console.log('Completing active trip:', activeTrip.id)
     
-    // Parse the start time and add 1 minute to ensure it's different
-    const timeMatch = activeTrip.start_time.match(/(\d+):(\d+)\s(AM|PM)/)
-    if (!timeMatch) {
-      console.error('Failed to parse time format:', activeTrip.start_time)
-      throw new Error('Invalid time format')
-    }
-    
-    let hours = parseInt(timeMatch[1])
-    let mins = parseInt(timeMatch[2])
-    const period = timeMatch[3]
-    
-    mins += 1
-    if (mins >= 60) {
-      mins = 0
-      hours += 1
-      if (hours > 12) {
-        hours = 1
+    let endTime = now
+    if (endTime === activeTrip.start_time) {
+      // Parse the start time and add 1 minute to ensure it's different
+      const timeMatch = activeTrip.start_time.match(/(\d+):(\d+)\s(AM|PM)/)
+      if (!timeMatch) {
+        console.error('Failed to parse time format:', activeTrip.start_time)
+        throw new Error('Invalid time format')
       }
+      
+      let hours = parseInt(timeMatch[1])
+      let mins = parseInt(timeMatch[2])
+      const period = timeMatch[3]
+      
+      mins += 1
+      if (mins >= 60) {
+        mins = 0
+        hours += 1
+        if (hours > 12) {
+          hours = 1
+        }
+      }
+      
+      endTime = `${hours}:${String(mins).padStart(2, '0')} ${period}`
     }
-    
-    const endTime = `${hours}:${String(mins).padStart(2, '0')} ${period}`
     console.log(`Updating end_time from ${activeTrip.start_time} to ${endTime}`)
     
     // Calculate distance from GPS points and duration
@@ -214,7 +217,7 @@ export async function createDriverTrip({
         truck_number: truckNumber,
         driver_receipt_number: receiptNumber,
         start_time: now,
-        end_time: now, // Same as start means active
+        end_time: null, // null means trip is active
         distance: 0,
         duration: '0h 00m',
         cost: '₱0',
@@ -1053,7 +1056,7 @@ export function useDriverPayroll(driverId?: number) {
   return { payroll, loading, error }
 }
 
-// GPS Tracking Hook - Save driver location
+// GPS Tracking Hook - Save driver location with offline support
 export function useGPSTracking() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1078,6 +1081,7 @@ export function useGPSTracking() {
         locationData.trip_id = tripId
       }
 
+      // Try to send to server
       const { data, error } = await supabase
         .from('driver_locations')
         .insert(locationData)
@@ -1088,6 +1092,33 @@ export function useGPSTracking() {
       const message = err instanceof Error ? err.message : 'Failed to send location'
       setError(message)
       console.error('GPS tracking error:', err)
+      
+      // If offline, queue the location for later sync
+      if (!navigator.onLine) {
+        try {
+          const gpsQueue = JSON.parse(localStorage.getItem('gps_queue') || '[]')
+          gpsQueue.push({
+            id: `gps-${Date.now()}`,
+            type: 'gps',
+            data: {
+              driver_id: driverId,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              speed: position.coords.speed || null,
+              heading: position.coords.heading || null,
+              timestamp: new Date().toISOString(),
+              trip_id: tripId || null
+            },
+            timestamp: Date.now(),
+            status: 'pending'
+          })
+          localStorage.setItem('gps_queue', JSON.stringify(gpsQueue))
+          console.log('GPS location queued for offline sync:', locationData)
+        } catch (queueErr) {
+          console.error('Failed to queue GPS location:', queueErr)
+        }
+      }
     } finally {
       setSending(false)
     }

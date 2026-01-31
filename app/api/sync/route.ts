@@ -57,6 +57,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, data })
       }
 
+      case 'gps': {
+        // Handle GPS location data sync
+        const { error } = await supabase
+          .from('driver_locations')
+          .insert([data])
+
+        if (error) throw error
+        return NextResponse.json({ success: true, data })
+      }
+
       default:
         return NextResponse.json(
           { error: `Unknown operation type: ${type}` },

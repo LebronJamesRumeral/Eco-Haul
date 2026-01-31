@@ -35,13 +35,13 @@ export default function DriverDashboard() {
     }
   }, [authLoading, user, isDriver, router])
 
-  // Check if there's an active trip (no end_time or end_time equals start_time)
+  // Check if there's an active trip (end_time is null)
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0]
     const todayTrips = trips.filter(trip => trip.driver_id === user?.driver_id && trip.date === today)
     console.log('Today trips:', todayTrips)
     const active = todayTrips.find(t => {
-      const isActive = !t.end_time || t.end_time === t.start_time
+      const isActive = t.end_time === null
       console.log(`Trip ${t.id}: start=${t.start_time}, end=${t.end_time}, active=${isActive}`)
       return isActive
     })
