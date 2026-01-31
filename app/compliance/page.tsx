@@ -45,11 +45,14 @@ export default function CompliancePage() {
   const [notes, setNotes] = useState("")
   
   // Filter trips with ALL 4 required fields (validated trips only)
+  // Also exclude active trips (where end_time is null)
   const validatedTrips = trips.filter(trip => 
     trip.truck_number && 
     trip.date && 
     trip.driver_name && 
-    trip.driver_receipt_number
+    trip.driver_receipt_number &&
+    trip.end_time !== null && // Exclude active trips
+    trip.end_time // Exclude empty end_time
   )
   
   const totalChecks = checks.length

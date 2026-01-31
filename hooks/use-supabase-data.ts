@@ -47,8 +47,11 @@ async function calculateDistanceFromGPS(driverId: number, tripId: number): Promi
 }
 
 // Calculate duration from GPS points (min to max timestamp)
-function calculateDurationFromTimestamps(startTime: string, endTime: string): string {
+function calculateDurationFromTimestamps(startTime: string, endTime: string | null): string {
   try {
+    // If endTime is null (active trip), return 0h 00m
+    if (!endTime) return '0h 00m'
+    
     // Parse time strings like "10:30 AM" or "2:45 PM"
     const parseTime = (timeStr: string) => {
       const match = timeStr.match(/(\d+):(\d+)\s(AM|PM)/)
