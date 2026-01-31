@@ -18,16 +18,16 @@ import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 export default function CompliancePage() {
   const router = useRouter()
-  const { user, showLoading: authLoading, isAdmin } = useAuth()
+  const { user, showLoading: authLoading } = useAuth()
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<string | undefined>(undefined)
   const [debounced, setDebounced] = useState("")
   
   useEffect(() => {
-    if (!authLoading && (!user || !isAdmin)) {
+    if (!authLoading && !user) {
       router.push('/login')
     }
-  }, [authLoading, user, isAdmin, router])
+  }, [authLoading, user, router])
   
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300)
