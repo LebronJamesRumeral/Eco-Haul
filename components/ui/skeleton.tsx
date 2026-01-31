@@ -11,10 +11,10 @@ function Skeleton({ className, variant = 'default', animation = 'shimmer', ...pr
       <style>{`
         @keyframes shimmer {
           0% {
-            background-position: -1000px 0;
+            background-position: -1200px 0;
           }
           100% {
-            background-position: 1000px 0;
+            background-position: 1200px 0;
           }
         }
         
@@ -29,16 +29,16 @@ function Skeleton({ className, variant = 'default', animation = 'shimmer', ...pr
         
         @keyframes wave {
           0% {
-            background-position: -1000px 0;
+            background-position: -1200px 0;
           }
           100% {
-            background-position: 1000px 0;
+            background-position: 1200px 0;
           }
         }
         
         .skeleton-shimmer {
-          animation: shimmer 2.5s ease-in-out infinite;
-          background-size: 1000px 100%;
+          animation: shimmer 2s ease-in-out infinite;
+          background-size: 1200px 100%;
         }
         
         .skeleton-pulse {
@@ -47,7 +47,7 @@ function Skeleton({ className, variant = 'default', animation = 'shimmer', ...pr
         
         .skeleton-wave {
           animation: wave 2s ease-in-out infinite;
-          background-size: 1000px 100%;
+          background-size: 1200px 100%;
         }
         
         /* Light mode */
@@ -55,8 +55,8 @@ function Skeleton({ className, variant = 'default', animation = 'shimmer', ...pr
           background: linear-gradient(
             90deg,
             hsl(var(--muted)) 0%,
-            hsl(var(--muted) / 0.7) 20%,
-            hsl(var(--muted)) 40%,
+            hsl(var(--muted) / 0.5) 15%,
+            hsl(var(--muted)) 30%,
             hsl(var(--muted)) 100%
           );
         }
@@ -66,8 +66,8 @@ function Skeleton({ className, variant = 'default', animation = 'shimmer', ...pr
           background: linear-gradient(
             90deg,
             hsl(var(--muted)) 0%,
-            hsl(var(--muted) / 1.2) 20%,
-            hsl(var(--muted)) 40%,
+            hsl(var(--muted) / 0.8) 15%,
+            hsl(var(--muted)) 30%,
             hsl(var(--muted)) 100%
           );
         }
@@ -78,8 +78,8 @@ function Skeleton({ className, variant = 'default', animation = 'shimmer', ...pr
           background: linear-gradient(
             90deg,
             hsl(var(--muted)) 0%,
-            hsl(var(--muted) / 1.1) 25%,
-            hsl(var(--muted)) 50%,
+            hsl(var(--muted) / 0.8) 20%,
+            hsl(var(--muted) / 0.5) 40%,
             hsl(var(--muted)) 100%
           );
         }

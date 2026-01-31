@@ -9,6 +9,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useTrips, useChartData, useDrivers, useTrucks, useAutoGenerateTrips } from '@/hooks/use-supabase-data'
 import { useAuth } from '@/hooks/use-auth'
+import { useMinimumLoading } from '@/hooks/use-minimum-loading'
 import { Skeleton } from '@/components/ui/skeleton'
 import { logout } from '@/lib/auth'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -18,6 +19,7 @@ export default function AdminDashboard() {
   const { user, loading: authLoading, isAdmin } = useAuth()
   const { trips, loading: tripsLoading } = useTrips()
   const { tripsPerDay, distancePerTruck, loading: chartLoading } = useChartData()
+  const showLoading = useMinimumLoading(tripsLoading || chartLoading, 800)
   const { drivers } = useDrivers()
   const { trucks } = useTrucks()
   // Auto-generate trips from GPS data
@@ -268,7 +270,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Active Trucks</CardTitle>
             </CardHeader>
             <CardContent>
-              {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{activeTrucksCount}</div>}
+              {showLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{activeTrucksCount}</div>}
               <p className="text-xs text-muted-foreground mt-1">Based on {rangeLabel}</p>
             </CardContent>
           </Card>
@@ -278,7 +280,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Drivers On Duty</CardTitle>
             </CardHeader>
             <CardContent>
-              {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{driversOnDutyCount}</div>}
+              {showLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-primary">{driversOnDutyCount}</div>}
               <p className="text-xs text-muted-foreground mt-1">Based on {rangeLabel}</p>
             </CardContent>
           </Card>
@@ -288,7 +290,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Trips</CardTitle>
             </CardHeader>
             <CardContent>
-              {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-accent">{filteredTrips.length}</div>}
+              {showLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-accent">{filteredTrips.length}</div>}
               <p className="text-xs text-muted-foreground mt-1">{rangeLabel}</p>
             </CardContent>
           </Card>
@@ -298,7 +300,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Distance (km)</CardTitle>
             </CardHeader>
             <CardContent>
-              {tripsLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold text-accent">{selectedDistance.toFixed(1)}</div>}
+              {showLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold text-accent">{selectedDistance.toFixed(1)}</div>}
               <p className="text-xs text-muted-foreground mt-1">Total for range</p>
             </CardContent>
           </Card>
@@ -308,7 +310,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Cost (₱)</CardTitle>
             </CardHeader>
             <CardContent>
-              {tripsLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold text-accent">₱{selectedCost.toLocaleString()}</div>}
+              {showLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold text-accent">₱{selectedCost.toLocaleString()}</div>}
               <p className="text-xs text-muted-foreground mt-1">Payroll estimate for range</p>
             </CardContent>
           </Card>
@@ -318,7 +320,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Active Trips</CardTitle>
             </CardHeader>
             <CardContent>
-              {tripsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-accent">{activeTrips}</div>}
+              {showLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold text-accent">{activeTrips}</div>}
               <p className="text-xs text-muted-foreground mt-1">Start=End (in progress)</p>
             </CardContent>
           </Card>
@@ -332,7 +334,7 @@ export default function AdminDashboard() {
               <CardDescription>Ranked by distance for {rangeLabel}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {tripsLoading ? (
+              {showLoading ? (
                 Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
               ) : topTrucksList.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No trips logged for this date.</p>
@@ -362,7 +364,7 @@ export default function AdminDashboard() {
               <CardDescription>Ranked by trips for {rangeLabel}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {tripsLoading ? (
+              {showLoading ? (
                 Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
               ) : topDriversList.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No trips logged for this date.</p>
@@ -528,7 +530,7 @@ export default function AdminDashboard() {
               <CardDescription>Weekly trip distribution</CardDescription>
             </CardHeader>
             <CardContent>
-              {chartLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-[300px] w-full" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
@@ -557,7 +559,7 @@ export default function AdminDashboard() {
               <CardDescription>Daily distance traveled (km)</CardDescription>
             </CardHeader>
             <CardContent>
-              {chartLoading ? (
+              {showLoading ? (
                 <Skeleton className="h-[300px] w-full" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
@@ -593,7 +595,7 @@ export default function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tripsLoading ? (
+                  {showLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i} className="border-border">
                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>

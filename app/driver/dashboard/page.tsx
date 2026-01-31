@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
+import { useNotifications } from '@/hooks/use-notifications'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ export default function DriverDashboard() {
   const router = useRouter()
   const { user, loading: authLoading, isDriver } = useAuth()
   const { trips, loading: tripsLoading, refetch } = useTrips()
+  const { notifyTripStarted, notifyTripCompleted } = useNotifications()
   const [creatingTrip, setCreatingTrip] = useState(false)
   
   // Fetch driver-specific data
@@ -115,6 +117,8 @@ export default function DriverDashboard() {
         truckNumber: truck.truck_number,
       })
       console.log('Trip created:', result)
+      // Send notification
+      notifyTripStarted(driver.name, truck.truck_number)
       await refetch()
     } catch (err) {
       const msg = err instanceof Error ? err.message : JSON.stringify(err)

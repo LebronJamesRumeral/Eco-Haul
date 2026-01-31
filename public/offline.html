@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoHaul - Offline</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 400px;
+      width: 100%;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 40px 24px;
+      text-align: center;
+    }
+
+    .icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 24px;
+      opacity: 0.5;
+    }
+
+    h1 {
+      font-size: 24px;
+      color: #1f2937;
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: #6b7280;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .features {
+      text-align: left;
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #374151;
+    }
+
+    .feature:last-child {
+      margin-bottom: 0;
+    }
+
+    .checkmark {
+      color: #10b981;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .status {
+      padding: 12px 16px;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #92400e;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2M5 13l2 2c3.76-3.76 9.24-3.76 13 0l2-2" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+
+    <h1>You're Offline</h1>
+    <p>
+      You don't have an internet connection, but EcoHaul is ready to work offline.
+    </p>
+
+    <div class="features">
+      <div class="feature">
+        <span class="checkmark">✓</span>
+        <span>View your cached data and information</span>
+      </div>
+      <div class="feature">
+        <span class="checkmark">✓</span>
+        <span>Create new entries (billing, payroll, trips)</span>
+      </div>
+      <div class="feature">
+        <span class="checkmark">✓</span>
+        <span>Changes sync automatically when online</span>
+      </div>
+    </div>
+
+    <div class="status">
+      <strong>Waiting for connection...</strong><br>
+      Reconnect to upload your offline changes.
+    </div>
+  </div>
+
+  <script>
+    // Reload page when connection returns
+    window.addEventListener('online', () => {
+      location.reload()
+    })
+  </script>
+</body>
+</html>

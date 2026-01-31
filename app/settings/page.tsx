@@ -145,14 +145,14 @@ export default function SettingsPage() {
         {/* Site Management */}
         <Card className="bg-card border-border">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
                 <CardTitle>Site Management</CardTitle>
                 <CardDescription>Manage mining sites for billing and payroll tracking</CardDescription>
               </div>
               <Button
                 onClick={() => setIsAddingSite(true)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Site

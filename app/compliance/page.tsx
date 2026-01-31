@@ -7,16 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useComplianceChecks, createComplianceCheck, updateComplianceCheck, useTrips } from "@/hooks/use-supabase-data"
+import { useComplianceChecks, createComplianceCheck, updateComplianceCheck, useTrips, usePayrollRecords } from "@/hooks/use-supabase-data"
 import { useAuth } from "@/hooks/use-auth"
+import { useMinimumLoading } from "@/hooks/use-minimum-loading"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 export default function CompliancePage() {
   const router = useRouter()
-  const { user, loading: authLoading, isAdmin } = useAuth()
+  const { user, showLoading: authLoading, isAdmin } = useAuth()
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<string | undefined>(undefined)
   const [debounced, setDebounced] = useState("")
@@ -31,16 +33,44 @@ export default function CompliancePage() {
     const t = setTimeout(() => setDebounced(search), 300)
     return () => clearTimeout(t)
   }, [search])
+  
   const { checks, loading } = useComplianceChecks(debounced, status as any)
   const { trips, loading: tripsLoading } = useTrips()
+  const { records: payrollRecords, loading: payrollLoading } = usePayrollRecords()
+  const showLoading = useMinimumLoading(loading || tripsLoading || payrollLoading, 800)
+  
   const [site, setSite] = useState("")
   const [truck, setTruck] = useState("")
   const [newStatus, setNewStatus] = useState("Compliant")
   const [notes, setNotes] = useState("")
   
+  // Filter trips with ALL 4 required fields (validated trips only)
+  const validatedTrips = trips.filter(trip => 
+    trip.truck_number && 
+    trip.date && 
+    trip.driver_name && 
+    trip.driver_receipt_number
+  )
+  
   const totalChecks = checks.length
   const compliantCount = checks.filter(c => c.status === 'Compliant').length
   const needsReviewCount = checks.filter(c => c.status === 'Needs Review').length
+  
+  // Calculate stats from validated trips and payroll records
+  const totalVerifiedTrips = validatedTrips.length
+  const totalPayrollCost = payrollRecords.reduce((sum, record) => sum + (record.payroll_cost || 0), 0)
+  const totalBillingCost = payrollRecords.reduce((sum, record) => sum + (record.total_cost || 0), 0)
+  const payrollByDriver = new Map()
+  
+  payrollRecords.forEach(record => {
+    if (!payrollByDriver.has(record.driver_name)) {
+      payrollByDriver.set(record.driver_name, { trips: 0, payroll: 0, billing: 0 })
+    }
+    const data = payrollByDriver.get(record.driver_name)
+    data.trips += record.trip_count
+    data.payroll += record.payroll_cost || 0
+    data.billing += record.total_cost || 0
+  })
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -50,13 +80,13 @@ export default function CompliancePage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Checks</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {showLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
                 <>
@@ -72,7 +102,7 @@ export default function CompliancePage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Compliant</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {showLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
                 <>
@@ -88,7 +118,7 @@ export default function CompliancePage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Needs Review</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {showLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
                 <>
@@ -98,9 +128,25 @@ export default function CompliancePage() {
               )}
             </CardContent>
           </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Verified Trips</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tripsLoading ? (
+                <Skeleton className="h-8 w-12" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-primary">{totalVerifiedTrips}</div>
+                  <p className="text-xs text-muted-foreground mt-1">With all required fields</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Trip Verification Section */}
+        {/* Trip Verification & Payroll Section */}
         <Card className="bg-card border-border">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -108,39 +154,37 @@ export default function CompliancePage() {
                 ✓
               </div>
               <div>
-                <CardTitle>Trip Verification</CardTitle>
-                <CardDescription>GPS-tracked trips with automatic distance and cost verification</CardDescription>
+                <CardTitle>Trip Verification & Payroll</CardTitle>
+                <CardDescription>Validated trips (with receipt numbers) and processed payroll records</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {tripsLoading ? (
+              {tripsLoading || payrollLoading ? (
                 <Skeleton className="h-32 w-full" />
-              ) : trips && trips.length > 0 ? (
+              ) : validatedTrips && validatedTrips.length > 0 && payrollRecords && payrollRecords.length > 0 ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div className="p-4 rounded-lg bg-background/50 border border-border">
                       <div className="text-sm text-muted-foreground mb-1">Total Verified Trips</div>
-                      <div className="text-2xl font-bold text-foreground">{trips.filter(t => t.distance && t.distance > 0).length}</div>
+                      <div className="text-2xl font-bold text-foreground">{totalVerifiedTrips}</div>
+                      <p className="text-xs text-muted-foreground mt-2">With all required fields: plate, date, driver, receipt #</p>
                     </div>
                     <div className="p-4 rounded-lg bg-background/50 border border-border">
-                      <div className="text-sm text-muted-foreground mb-1">Total Distance</div>
-                      <div className="text-2xl font-bold text-foreground">
-                        {trips.filter(t => t.distance && t.distance > 0).reduce((sum, trip) => sum + (trip.distance || 0), 0).toFixed(2)} km
-                      </div>
+                      <div className="text-sm text-muted-foreground mb-1">Payroll Records</div>
+                      <div className="text-2xl font-bold text-foreground">{payrollRecords.length}</div>
+                      <p className="text-xs text-muted-foreground mt-2">Processed payroll entries</p>
                     </div>
-                    <div className="p-4 rounded-lg bg-background/50 border border-border">
-                      <div className="text-sm text-muted-foreground mb-1">GPS Tracked</div>
-                      <div className="text-2xl font-bold text-accent">
-                        {((trips.filter(t => t.distance && t.distance > 0).length / Math.max(trips.length, 1)) * 100).toFixed(0)}%
-                      </div>
+                    <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                      <div className="text-sm text-muted-foreground mb-1">Total Billing Cost</div>
+                      <div className="text-2xl font-bold text-blue-600">₱{totalBillingCost.toLocaleString()}</div>
+                      <p className="text-xs text-muted-foreground mt-2">Client billing amount</p>
                     </div>
-                    <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary">
-                      <div className="text-sm text-muted-foreground mb-1">Total Cost</div>
-                      <div className="text-2xl font-bold text-primary">
-                        ₱{trips.filter(t => t.distance && t.distance > 0).reduce((sum, trip) => sum + ((trip.distance || 0) * 50), 0).toLocaleString()}
-                      </div>
+                    <div className="p-4 rounded-lg bg-green-500/10 border-2 border-green-500/30">
+                      <div className="text-sm text-muted-foreground mb-1">Total Payroll Cost</div>
+                      <div className="text-2xl font-bold text-green-600">₱{totalPayrollCost.toLocaleString()}</div>
+                      <p className="text-xs text-muted-foreground mt-2">Driver payment amount</p>
                     </div>
                   </div>
 
@@ -148,50 +192,43 @@ export default function CompliancePage() {
                     <table className="w-full text-sm">
                       <thead className="border-b border-border bg-background/50">
                         <tr className="text-muted-foreground">
-                          <th className="text-left py-3 px-2">Trip ID</th>
                           <th className="text-left py-3 px-2">Driver</th>
-                          <th className="text-right py-3 px-2">Distance (km)</th>
-                          <th className="text-right py-3 px-2">Cost (₱50/km)</th>
-                          <th className="text-left py-3 px-2">Duration</th>
-                          <th className="text-center py-3 px-2">Status</th>
+                          <th className="text-left py-3 px-2">Date</th>
+                          <th className="text-center py-3 px-2">Trips</th>
+                          <th className="text-right py-3 px-2">Billing Cost (₱)</th>
+                          <th className="text-right py-3 px-2">Payroll Cost (₱)</th>
+                          <th className="text-left py-3 px-2">Tier</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {trips.slice(0, 15).map((trip) => {
-                          const isVerified = trip.distance && trip.distance > 0
+                        {payrollRecords.slice(0, 20).map((record) => {
+                          const tripCount = record.trip_count
+                          const tier = tripCount <= 2 ? '1-2 trips (×400)' : tripCount === 3 ? '3 trips (×500)' : '4+ trips (×625)'
                           return (
-                            <tr key={trip.id} className="border-b border-border hover:bg-background/50">
-                              <td className="py-3 px-2 text-foreground text-xs">#{String(trip.id).slice(0, 8)}</td>
-                              <td className="py-3 px-2 text-foreground">{trip.driver_name || 'Unknown'}</td>
-                              <td className="py-3 px-2 text-right text-foreground">
-                                {isVerified ? `${(trip.distance || 0).toFixed(2)}` : '—'}
-                              </td>
-                              <td className="py-3 px-2 text-right font-semibold text-accent">
-                                {isVerified ? `₱${((trip.distance || 0) * 50).toLocaleString()}` : '₱0'}
-                              </td>
-                              <td className="py-3 px-2 text-muted-foreground text-xs">{trip.duration || '—'}</td>
-                              <td className="py-3 px-2 text-center">
-                                <Badge className={isVerified ? 'bg-green-500/20 text-green-700 hover:bg-green-500/20' : 'bg-yellow-500/20 text-yellow-700 hover:bg-yellow-500/20'}>
-                                  {isVerified ? '✓ Verified' : 'Pending'}
-                                </Badge>
-                              </td>
+                            <tr key={record.id} className="border-b border-border hover:bg-background/50">
+                              <td className="py-3 px-2 font-medium text-foreground">{record.driver_name}</td>
+                              <td className="py-3 px-2 text-foreground text-xs">{new Date(record.date).toLocaleDateString()}</td>
+                              <td className="py-3 px-2 text-center text-foreground font-semibold">{tripCount}</td>
+                              <td className="py-3 px-2 text-right text-blue-600 font-semibold">₱{record.total_cost.toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right text-green-600 font-semibold">₱{(record.payroll_cost || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-xs text-muted-foreground">{tier}</td>
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
                   </div>
-                  {trips.length > 15 && (
+                  {payrollRecords.length > 20 && (
                     <div className="text-center text-xs text-muted-foreground mt-2">
-                      ... and {trips.length - 15} more trips
+                      ... and {payrollRecords.length - 20} more payroll records
                     </div>
                   )}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="text-4xl mb-2">📋</div>
-                  <p className="text-muted-foreground">No GPS trips recorded yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Trip data will appear once drivers complete trips with GPS tracking</p>
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">No validated trips or payroll records yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Trips must have: plate number, date, driver, and receipt number to be counted</p>
                 </div>
               )}
             </div>
@@ -286,7 +323,7 @@ export default function CompliancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading ? (
+                  {showLoading ? (
                     Array.from({ length: 6 }).map((_, i) => (
                       <TableRow key={i} className="border-border">
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
