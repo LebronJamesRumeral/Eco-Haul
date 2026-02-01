@@ -11,40 +11,39 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useDriverLocations, useToggleTracking } from '@/hooks/use-supabase-data'
-import { MapPin, Navigation, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
-import dynamic from 'next/dynamic'
+import { getAllDriverPaths } from '@/hooks/use-driver-paths'
+import { GPSMapView } from '@/components/gps-map-view'
+import { MapPin, Navigation, Clock, CheckCircle2, AlertCircle, Route } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
-
-const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false })
-const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false })
-const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false })
-const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false })
 
 export default function GPSTrackingPage() {
   const router = useRouter()
   const { user, loading: authLoading, isAdmin } = useAuth()
   const { locations, loading, error } = useDriverLocations()
   const { toggleTracking, updating } = useToggleTracking()
-  const [isClient, setIsClient] = useState(false)
+  const [driverPaths, setDriverPaths] = useState<any[]>([])
+  const [loadingPaths, setLoadingPaths] = useState(true)
+  const [showPaths, setShowPaths] = useState(true)
 
+  // Fetch driver paths with GPS locations
   useEffect(() => {
-    setIsClient(true)
-    
-    // Fix Leaflet default icon paths on the client
-    if (typeof window !== 'undefined') {
-      import('leaflet').then((L) => {
-        const defaultIcon = L.default.icon({
-          iconUrl: '/leaflet/marker-icon.png',
-          iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-          shadowUrl: '/leaflet/marker-shadow.png',
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        })
-        L.default.Marker.prototype.options.icon = defaultIcon
-      })
+    async function fetchPaths() {
+      setLoadingPaths(true)
+      try {
+        const paths = await getAllDriverPaths()
+        setDriverPaths(paths)
+      } catch (err) {
+        console.error('Error fetching driver paths:', err)
+      } finally {
+        setLoadingPaths(false)
+      }
     }
+
+    fetchPaths()
+    
+    // Refresh paths every 30 seconds
+    const interval = setInterval(fetchPaths, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -78,9 +77,6 @@ export default function GPSTrackingPage() {
   }
 
   const activeLocations = locations.filter(loc => loc.tracking_enabled)
-  const mapCenter = activeLocations.length
-    ? [activeLocations[0].latitude, activeLocations[0].longitude] as [number, number]
-    : [14.5995, 120.9842] // Manila fallback
 
   if (authLoading || loading) {
     return (
@@ -123,7 +119,7 @@ export default function GPSTrackingPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {locations.filter(loc => loc.seconds_since_update < 120 && loc.tracking_enabled).length}
+                {new Set(driverPaths.map(p => p.driver_id)).size}
               </div>
             </CardContent>
           </Card>
@@ -153,41 +149,44 @@ export default function GPSTrackingPage() {
           </Card>
         </div>
 
-        {/* Live Map */}
+        {/* Enhanced Map with Paths */}
         <Card>
           <CardHeader>
-            <CardTitle>Live Map View</CardTitle>
-            <CardDescription>Drivers with tracking enabled appear as map pins</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Route className="h-5 w-5" />
+                  Live GPS Tracking with Routes
+                </CardTitle>
+                <CardDescription>
+                  Each driver has a unique color showing their traveled path and current location
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPaths(!showPaths)}
+                className="w-fit"
+              >
+                {showPaths ? 'Hide Paths' : 'Show Paths'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg overflow-hidden border border-border/40">
-              {isClient && (
-                <MapContainer center={mapCenter} zoom={11} style={{ height: '400px', width: '100%' }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-                  {activeLocations.map((loc) => (
-                    <Marker key={loc.driver_id} position={[loc.latitude, loc.longitude]}>
-                      <Popup>
-                        <div className="space-y-1">
-                          <p className="font-semibold text-sm">{loc.driver_name}</p>
-                          <p className="text-xs text-muted-foreground">Truck: {loc.truck_number || '—'}</p>
-                          <p className="text-xs text-muted-foreground">Updated: {getTimeAgo(loc.seconds_since_update)}</p>
-                          <a
-                            href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            Open in Google Maps
-                          </a>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                </MapContainer>
-              )}
-            </div>
-            {activeLocations.length === 0 && (
-              <p className="text-sm text-muted-foreground mt-3">No drivers with tracking enabled yet.</p>
+            {loadingPaths ? (
+              <div className="rounded-lg bg-muted animate-pulse" style={{ height: '500px' }} />
+            ) : driverPaths.length === 0 ? (
+              <div className="text-center py-12 border border-border rounded-lg">
+                <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">No GPS data available</p>
+                <p className="text-sm text-muted-foreground">Drivers will appear here once they start tracking</p>
+              </div>
+            ) : (
+              <GPSMapView 
+                driverLocations={driverPaths} 
+                showPaths={showPaths}
+                height="500px"
+              />
             )}
           </CardContent>
         </Card>

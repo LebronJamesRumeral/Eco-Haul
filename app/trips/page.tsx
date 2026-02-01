@@ -17,6 +17,11 @@ export default function TripsPage() {
   const { user, loading: authLoading, isDriver, isAdmin } = useAuth()
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
+  const today = new Date().toISOString().split('T')[0]
+  const [startDate, setStartDate] = useState(today)
+  const [endDate, setEndDate] = useState(today)
+  const [singleDate, setSingleDate] = useState(today)
+  const [dateMode, setDateMode] = useState<'range' | 'single' | 'all'>('all')
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,10 +36,34 @@ export default function TripsPage() {
   
   const { trips, loading } = useTrips({ search: debounced })
 
-  // Filter trips based on user role
-  const displayedTrips = isDriver && user?.driver_id
+  // Normalize date range
+  const normalizedRangeStart = startDate && endDate && startDate <= endDate ? startDate : endDate
+  const normalizedRangeEnd = startDate && endDate && startDate <= endDate ? endDate : startDate
+
+  // Filter trips based on user role and date
+  let displayedTrips = isDriver && user?.driver_id
     ? trips.filter(trip => trip.driver_id === user.driver_id)
     : trips
+  
+  // Apply date filter based on mode
+  displayedTrips = displayedTrips.filter((trip) => {
+    if (dateMode === 'all') return true
+    if (dateMode === 'single') return trip.date === singleDate
+    return trip.date >= normalizedRangeStart && trip.date <= normalizedRangeEnd
+  })
+
+  // Group trips by date
+  const tripsByDate = displayedTrips.reduce((acc, trip) => {
+    const date = trip.date
+    if (!acc[date]) {
+      acc[date] = []
+    }
+    acc[date].push(trip)
+    return acc
+  }, {} as Record<string, typeof displayedTrips>)
+
+  // Sort dates in descending order (newest first)
+  const sortedDates = Object.keys(tripsByDate).sort((a, b) => b.localeCompare(a))
 
   // Create Trip form state
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
@@ -74,158 +103,246 @@ export default function TripsPage() {
         {/* Trip Table */}
         <Card className="bg-card border-border">
           <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Trip Logs</CardTitle>
-                <CardDescription>
-                  {isDriver ? "Your trip history" : "Complete record of all trips with timestamps and costs"}
-                </CardDescription>
+            <div className="space-y-4">
+              {/* Title and Search */}
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="flex-1">
+                  <CardTitle>Trip Logs</CardTitle>
+                  <CardDescription className="mt-1.5">
+                    {isDriver ? "Your trip history" : "Complete record of all trips with timestamps and costs"}
+                  </CardDescription>
+                </div>
+                {!isDriver && (
+                  <div className="w-full sm:w-auto sm:min-w-[280px]">
+                    <Input
+                      placeholder="Search driver or truck..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
-              {!isDriver && (
-                <Input
-                  placeholder="Search driver or truck..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="max-w-xs"
-                />
-              )}
+              
+              {/* Date Range Picker */}
+              <div className="rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setDateMode('all')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    All dates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateMode('single')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'single' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Single date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateMode('range')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'range' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Date range
+                  </button>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Range start</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      disabled={dateMode !== 'range'}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9 disabled:opacity-60"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Range end</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      disabled={dateMode !== 'range'}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9 disabled:opacity-60"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Single date</label>
+                    <input
+                      type="date"
+                      value={singleDate}
+                      onChange={(e) => setSingleDate(e.target.value)}
+                      disabled={dateMode !== 'single'}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary h-9 disabled:opacity-60"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             {/* Create Trip - Only for Admin */}
             {isAdmin && (
-              <div className="mb-4 p-4 border border-border rounded-lg">
-                <h3 className="font-semibold mb-3 text-foreground">Add Trip</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div>
-                    <Label>Date</Label>
-                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <h3 className="font-semibold mb-4 text-foreground text-base">Add Trip</h3>
+                <div className="space-y-4">
+                  {/* Row 1 */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</Label>
+                      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Truck #</Label>
+                      <Input value={truckNumber} onChange={(e) => setTruckNumber(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Driver</Label>
+                      <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Receipt #</Label>
+                      <Input placeholder="RCP-001-001" value={receiptNumber} onChange={(e) => setReceiptNumber(e.target.value)} className="mt-1" />
+                    </div>
                   </div>
-                  <div>
-                    <Label>Truck #</Label>
-                    <Input value={truckNumber} onChange={(e) => setTruckNumber(e.target.value)} />
+                  
+                  {/* Row 2 */}
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start Time</Label>
+                      <Input placeholder="06:00 AM" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">End Time</Label>
+                      <Input placeholder="08:15 AM" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Distance (km)</Label>
+                      <Input type="number" value={distance} onChange={(e) => setDistance(Number(e.target.value))} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</Label>
+                      <Input placeholder="2h 15m" value={duration} onChange={(e) => setDuration(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost</Label>
+                      <Input placeholder="₱2,250" value={cost} onChange={(e) => setCost(e.target.value)} className="mt-1" />
+                    </div>
                   </div>
-                  <div>
-                    <Label>Driver</Label>
-                    <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+                  
+                  {/* Save Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={async () => {
+                        // Validate all 4 required fields
+                        if (!truckNumber || !driverName || !receiptNumber || !date) {
+                          alert("Please fill in all required fields: Truck, Driver, Receipt Number, and Date")
+                          return
+                        }
+                        await createTrip({ 
+                          date, 
+                          truck_id: null as any, 
+                          truck_number: truckNumber, 
+                          driver_id: null as any, 
+                          driver_name: driverName,
+                          driver_receipt_number: receiptNumber,
+                          start_time: startTime, 
+                          end_time: endTime, 
+                          distance, 
+                          duration, 
+                          cost 
+                        })
+                        // Reset form
+                        setTruckNumber("")
+                        setDriverName("")
+                        setReceiptNumber("")
+                        setStartTime("")
+                        setEndTime("")
+                        setDistance(0)
+                        setDuration("")
+                        setCost("")
+                      }}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-3 py-2 text-sm whitespace-nowrap"
+                    >
+                      Save Trip
+                    </Button>
                   </div>
-                  <div>
-                    <Label>Receipt #</Label>
-                    <Input placeholder="RCP-001-001" value={receiptNumber} onChange={(e) => setReceiptNumber(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Start Time</Label>
-                    <Input placeholder="06:00 AM" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                  </div>
-                <div>
-                  <Label>End Time</Label>
-                  <Input placeholder="08:15 AM" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Distance (km)</Label>
-                  <Input type="number" value={distance} onChange={(e) => setDistance(Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Duration</Label>
-                  <Input placeholder="2h 15m" value={duration} onChange={(e) => setDuration(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Cost</Label>
-                  <Input placeholder="₱2,250" value={cost} onChange={(e) => setCost(e.target.value)} />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={async () => {
-                      // Validate all 4 required fields
-                      if (!truckNumber || !driverName || !receiptNumber || !date) {
-                        alert("Please fill in all required fields: Truck, Driver, Receipt Number, and Date")
-                        return
-                      }
-                      await createTrip({ 
-                        date, 
-                        truck_id: null as any, 
-                        truck_number: truckNumber, 
-                        driver_id: null as any, 
-                        driver_name: driverName,
-                        driver_receipt_number: receiptNumber,
-                        start_time: startTime, 
-                        end_time: endTime, 
-                        distance, 
-                        duration, 
-                        cost 
-                      })
-                      // Reset form
-                      setTruckNumber("")
-                      setDriverName("")
-                      setReceiptNumber("")
-                      setStartTime("")
-                      setEndTime("")
-                      setDistance(0)
-                      setDuration("")
-                      setCost("")
-                    }}
-                    className="bg-accent text-accent-foreground"
-                  >
-                    Save Trip
-                  </Button>
-                </div>
                 </div>
               </div>
             )}
-            <div className="border border-border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader className="bg-muted">
-                  <TableRow className="border-border">
-                    <TableHead className="text-foreground">Date</TableHead>
-                    {!isDriver && <TableHead className="text-foreground">Truck</TableHead>}
-                    {!isDriver && <TableHead className="text-foreground">Driver</TableHead>}
-                    <TableHead className="text-foreground">Receipt #</TableHead>
-                    <TableHead className="text-foreground">Start Time</TableHead>
-                    <TableHead className="text-foreground">End Time</TableHead>
-                    <TableHead className="text-right text-foreground">Distance (km)</TableHead>
-                    <TableHead className="text-right text-foreground">Duration</TableHead>
-                    <TableHead className="text-right text-foreground">Earnings</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 10 }).map((_, i) => (
-                      <TableRow key={i} className="border-border">
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        {!isDriver && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
-                        {!isDriver && <TableCell><Skeleton className="h-4 w-32" /></TableCell>}
-                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : displayedTrips.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={isDriver ? 6 : 9} className="text-center text-muted-foreground py-8">
-                        {isDriver ? "No trips yet" : "No trips found"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    displayedTrips.map((trip) => (
-                      <TableRow key={trip.id} className="border-border hover:bg-muted/50">
-                        <TableCell className="font-medium text-foreground">{trip.date}</TableCell>
-                        {!isDriver && <TableCell className="text-foreground">{trip.truck_number}</TableCell>}
-                        {!isDriver && <TableCell className="text-foreground">{trip.driver_name}</TableCell>}
-                        <TableCell className="text-foreground">{trip.driver_receipt_number || 'N/A'}</TableCell>
-                        <TableCell className="text-foreground">{trip.start_time}</TableCell>
-                        <TableCell className="text-foreground">{trip.end_time}</TableCell>
-                        <TableCell className="text-right text-foreground">{trip.distance}</TableCell>
-                        <TableCell className="text-right text-foreground">{trip.duration}</TableCell>
-                        <TableCell className="text-right text-accent font-semibold">{trip.cost}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            
+            {/* Trips grouped by date */}
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="border border-border rounded-lg p-4">
+                    <Skeleton className="h-6 w-32 mb-4" />
+                    <Skeleton className="h-32 w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : displayedTrips.length === 0 ? (
+              <div className="text-center py-12 border border-border rounded-lg">
+                <p className="text-lg font-medium text-foreground">{isDriver ? "No trips yet" : "No trips found"}</p>
+                <p className="text-sm text-muted-foreground mt-1">Trips will appear here once they are created</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sortedDates.map((date) => {
+                  const tripsForDate = tripsByDate[date]
+                  const tripCount = tripsForDate.length
+                  const totalDistance = tripsForDate.reduce((sum, trip) => sum + Number(trip.distance || 0), 0)
+                  
+                  return (
+                    <div key={date} className="border border-border rounded-lg overflow-hidden bg-card">
+                      {/* Date Header */}
+                      <div className="bg-muted px-4 py-3 border-b border-border">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-lg text-foreground">{date}</h3>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>{tripCount} {tripCount === 1 ? 'trip' : 'trips'}</span>
+                            <span>•</span>
+                            <span>{totalDistance.toFixed(1)} km total</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Trips Table */}
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow className="border-border">
+                            {!isDriver && <TableHead className="text-foreground">Truck</TableHead>}
+                            {!isDriver && <TableHead className="text-foreground">Driver</TableHead>}
+                            <TableHead className="text-foreground">Receipt #</TableHead>
+                            <TableHead className="text-foreground">Start Time</TableHead>
+                            <TableHead className="text-foreground">End Time</TableHead>
+                            <TableHead className="text-right text-foreground">Distance (km)</TableHead>
+                            <TableHead className="text-right text-foreground">Duration</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tripsForDate.map((trip) => (
+                            <TableRow key={trip.id} className="border-border hover:bg-muted/50">
+                              {!isDriver && <TableCell className="text-foreground">{trip.truck_number}</TableCell>}
+                              {!isDriver && <TableCell className="text-foreground">{trip.driver_name}</TableCell>}
+                              <TableCell className="text-foreground">{trip.driver_receipt_number || 'N/A'}</TableCell>
+                              <TableCell className="text-foreground">{trip.start_time}</TableCell>
+                              <TableCell className="text-foreground">{trip.end_time}</TableCell>
+                              <TableCell className="text-right text-foreground">{trip.distance}</TableCell>
+                              <TableCell className="text-right text-foreground">{trip.duration}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

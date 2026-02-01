@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { useGPSTracking } from '@/hooks/use-supabase-data'
+import { useGPSBatchTracking } from '@/hooks/use-gps-batch-tracking'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { MapPin } from 'lucide-react'
 
@@ -12,7 +12,7 @@ interface GPSTrackerProps {
 
 export function GPSTracker({ activeTrip }: GPSTrackerProps) {
   const { user } = useAuth()
-  const { sendLocation, error } = useGPSTracking()
+  const { addLocation, queueSize } = useGPSBatchTracking(user?.driver_id, activeTrip?.id)
   const [trackingStatus, setTrackingStatus] = useState<'active' | 'inactive' | 'error'>('inactive')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
@@ -53,15 +53,15 @@ export function GPSTracker({ activeTrip }: GPSTrackerProps) {
     // Start watching position only when trip is active
     const startTracking = () => {
       watchIdRef.current = navigator.geolocation.watchPosition(
-        async (position) => {
+        (position) => {
           try {
-            // Pass trip ID to link GPS point to trip
-            await sendLocation(user.driver_id!, position, activeTrip?.id)
+            // Add to batch queue instead of sending immediately
+            addLocation(user.driver_id!, position, activeTrip?.id)
             setTrackingStatus('active')
             setLastUpdate(new Date())
             setGeoError(null)
           } catch (err) {
-            console.error('Failed to send location:', err)
+            console.error('Failed to queue location:', err)
             setTrackingStatus('error')
           }
         },
@@ -87,7 +87,7 @@ export function GPSTracker({ activeTrip }: GPSTrackerProps) {
         navigator.geolocation.clearWatch(watchIdRef.current)
       }
     }
-  }, [user, sendLocation, activeTrip])
+  }, [user, addLocation, activeTrip])
 
   // Don't show anything for non-drivers
   if (!user || user.role !== 'driver') {
@@ -95,12 +95,12 @@ export function GPSTracker({ activeTrip }: GPSTrackerProps) {
   }
 
   // Show error if tracking failed
-  if (trackingStatus === 'error' && (error || geoError)) {
+  if (trackingStatus === 'error' && geoError) {
     return (
       <Alert variant="destructive" className="mb-4">
         <MapPin className="h-4 w-4" />
         <AlertDescription>
-          {geoError || error || 'GPS tracking error. Please check location permissions.'}
+          {geoError || 'GPS tracking error. Please check location permissions.'}
         </AlertDescription>
       </Alert>
     )
@@ -115,6 +115,7 @@ export function GPSTracker({ activeTrip }: GPSTrackerProps) {
         {lastUpdate && trackingStatus === 'active' && (
           <span className="ml-2">
             (Last update: {lastUpdate.toLocaleTimeString()})
+            {queueSize > 0 && <span className="ml-2 text-orange-500">• {queueSize} queued</span>}
           </span>
         )}
       </span>

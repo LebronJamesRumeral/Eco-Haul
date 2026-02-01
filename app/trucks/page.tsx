@@ -74,39 +74,38 @@ export default function TrucksPage() {
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             {/* Create Truck */}
-            <div className="mb-4 p-4 border border-border rounded-lg">
-              <h3 className="font-semibold mb-3 text-foreground">Add Truck</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <h3 className="font-semibold mb-4 text-foreground text-base">Add Truck</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                 <div>
-                  <Label htmlFor="truckNumber">Truck #</Label>
-                  <Input id="truckNumber" value={truckNumber} onChange={(e) => setTruckNumber(e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="plateNumber">Plate #</Label>
-                  <Input id="plateNumber" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
+                  <Label htmlFor="truckNumber" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Truck #</Label>
+                  <Input id="truckNumber" value={truckNumber} onChange={(e) => setTruckNumber(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label htmlFor="capacity">Capacity (tons)</Label>
-                  <Input id="capacity" type="number" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} />
+                  <Label htmlFor="plateNumber" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plate #</Label>
+                  <Input id="plateNumber" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} className="mt-1" />
                 </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={async () => {
-                      if (!truckNumber || !plateNumber || !capacity) return
-                      const created = await createTruck({ truck_number: truckNumber, plate_number: plateNumber, capacity, status: "Active" })
-                      setTruckNumber("")
-                      setPlateNumber("")
-                      setCapacity(25)
-                    }}
-                    className="bg-accent text-accent-foreground"
-                  >
-                    Save Truck
-                  </Button>
+                <div>
+                  <Label htmlFor="capacity" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Capacity (tons)</Label>
+                  <Input id="capacity" type="number" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="mt-1" />
                 </div>
+                <Button
+                  onClick={async () => {
+                    if (!truckNumber || !plateNumber || !capacity) return
+                    const created = await createTruck({ truck_number: truckNumber, plate_number: plateNumber, capacity, status: "Active" })
+                    setTruckNumber("")
+                    setPlateNumber("")
+                    setCapacity(25)
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-3 py-2 text-sm whitespace-nowrap"
+                >
+                  Save Truck
+                </Button>
               </div>
             </div>
+            
             <div className="border border-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader className="bg-muted">

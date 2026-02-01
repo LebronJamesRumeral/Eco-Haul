@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
   const [singleDate, setSingleDate] = useState(today)
-  const [dateMode, setDateMode] = useState<'range' | 'single' | 'all'>('range')
+  const [dateMode, setDateMode] = useState<'range' | 'single' | 'all'>('all')
   const [selectedDriver, setSelectedDriver] = useState<string>('all')
   const [selectedTruck, setSelectedTruck] = useState<string>('all')
   const [detailTruck, setDetailTruck] = useState<string>('')
@@ -165,10 +165,10 @@ export default function AdminDashboard() {
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-1">
                 <button
                   type="button"
-                  onClick={() => setDateMode('range')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'range' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setDateMode('all')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                  Date range
+                  All dates
                 </button>
                 <button
                   type="button"
@@ -179,10 +179,10 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDateMode('all')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setDateMode('range')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${dateMode === 'range' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                  All dates
+                  Date range
                 </button>
               </div>
 

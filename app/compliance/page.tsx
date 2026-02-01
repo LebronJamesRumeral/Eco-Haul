@@ -267,23 +267,23 @@ export default function CompliancePage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             {/* Create Compliance Check */}
-            <div className="mb-4 p-4 border border-border rounded-lg">
-              <h3 className="font-semibold mb-3 text-foreground">Add Compliance Check</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <h3 className="font-semibold mb-4 text-foreground text-base">Add Compliance Check</h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <div>
-                  <Label>Site</Label>
-                  <Input value={site} onChange={(e) => setSite(e.target.value)} />
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Site</Label>
+                  <Input value={site} onChange={(e) => setSite(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label>Truck #</Label>
-                  <Input value={truck} onChange={(e) => setTruck(e.target.value)} />
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Truck #</Label>
+                  <Input value={truck} onChange={(e) => setTruck(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label>Status</Label>
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</Label>
                   <Select value={newStatus} onValueChange={setNewStatus}>
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -294,26 +294,25 @@ export default function CompliancePage() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Notes</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes</Label>
+                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" />
                 </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={async () => {
-                      if (!site || !truck) return
-                      await createComplianceCheck({ site, truck_id: null as any, truck_number: truck, status: newStatus as any, notes })
-                      setSite("")
-                      setTruck("")
-                      setNewStatus("Compliant")
-                      setNotes("")
-                    }}
-                    className="bg-accent text-accent-foreground"
-                  >
-                    Save Check
-                  </Button>
-                </div>
+                <Button
+                  onClick={async () => {
+                    if (!site || !truck) return
+                    await createComplianceCheck({ site, truck_id: null as any, truck_number: truck, status: newStatus as any, notes })
+                    setSite("")
+                    setTruck("")
+                    setNewStatus("Compliant")
+                    setNotes("")
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-3 py-2 text-sm whitespace-nowrap"
+                >
+                  Save Check
+                </Button>
               </div>
             </div>
+            
             <div className="border border-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader className="bg-muted">

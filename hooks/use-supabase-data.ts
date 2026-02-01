@@ -370,6 +370,41 @@ export function useTrips(filters?: { date?: string; truck?: string; driver?: str
 
   useEffect(() => {
     fetchTrips()
+    
+    // Set up realtime subscription for trips table
+    const channel = supabase
+      .channel('trips-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trips' },
+        (payload) => {
+          console.log('Trip update received:', payload)
+          
+          if (payload.eventType === 'INSERT') {
+            // Add new trip to the list
+            setTrips((prev) => [payload.new as Trip, ...prev])
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing trip
+            setTrips((prev) =>
+              prev.map((trip) =>
+                trip.id === payload.new.id ? (payload.new as Trip) : trip
+              )
+            )
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted trip
+            setTrips((prev) => prev.filter((trip) => trip.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to trip updates')
+        }
+      })
+    
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [fetchTrips])
 
   return { trips, loading, error, refetch: fetchTrips }
@@ -407,6 +442,28 @@ export function useTrucks(search?: string) {
     }
 
     fetchTrucks()
+    
+    // Set up realtime subscription for trucks table
+    const channel = supabase
+      .channel('trucks-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trucks' },
+        (payload) => {
+          console.log('Truck update received:', payload)
+          // Refetch to get latest data
+          fetchTrucks()
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to truck updates')
+        }
+      })
+    
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [search])
 
   return { trucks, loading, error }
@@ -466,6 +523,28 @@ export function useDrivers(search?: string) {
     }
 
     fetchDrivers()
+    
+    // Set up realtime subscription for drivers table
+    const channel = supabase
+      .channel('drivers-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'drivers' },
+        (payload) => {
+          console.log('Driver update received:', payload)
+          // Refetch to get latest data with calculated stats
+          fetchDrivers()
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to driver updates')
+        }
+      })
+    
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [search])
 
   return { drivers, loading, error }
@@ -1131,7 +1210,7 @@ export function useGPSTracking() {
   return { sendLocation, sending, error }
 }
 
-// Get all driver locations (for admin)
+// Get all driver locations (for admin) - with Realtime updates
 export function useDriverLocations() {
   const [locations, setLocations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -1158,9 +1237,27 @@ export function useDriverLocations() {
 
     fetchLocations()
     
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchLocations, 10000)
-    return () => clearInterval(interval)
+    // Set up realtime subscription for driver_locations table
+    const channel = supabase
+      .channel('driver-locations-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'driver_locations' },
+        (payload) => {
+          console.log('Driver location update received:', payload)
+          // Refetch to get updated view data
+          fetchLocations()
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to driver location updates')
+        }
+      })
+    
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   return { locations, loading, error }

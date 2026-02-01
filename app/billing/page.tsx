@@ -662,7 +662,7 @@ export default function BillingPage() {
               onClick={generateReceipt}
               disabled={isSaving}
               size="lg"
-              className="w-full bg-primary hover:bg-primary/90 font-semibold"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold"
             >
               <Download size={18} className="mr-2" />
               {isSaving ? "Saving..." : "Save Billing & Payroll Record"}
@@ -682,7 +682,7 @@ export default function BillingPage() {
                 <Button
                   onClick={exportToExcel}
                   size="sm"
-                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
                 >
                   <FileSpreadsheet size={16} className="mr-2" />
                   Export to Excel

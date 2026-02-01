@@ -73,19 +73,19 @@ export default function DriversPage() {
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             {/* Create Driver */}
-            <div className="mb-4 p-4 border border-border rounded-lg">
-              <h3 className="font-semibold mb-3 text-foreground">Add Driver</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <h3 className="font-semibold mb-4 text-foreground text-base">Add Driver</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                 <div>
-                  <Label htmlFor="driverName">Name</Label>
-                  <Input id="driverName" value={name} onChange={(e) => setName(e.target.value)} />
+                  <Label htmlFor="driverName" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</Label>
+                  <Input id="driverName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label>Status</Label>
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</Label>
                   <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -95,21 +95,20 @@ export default function DriversPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={async () => {
-                      if (!name) return
-                      const created = await createDriver({ name, status: status as any, trips_today: 0, distance_today: 0 })
-                      setName("")
-                      setStatus("On Duty")
-                    }}
-                    className="bg-accent text-accent-foreground"
-                  >
-                    Save Driver
-                  </Button>
-                </div>
+                <Button
+                  onClick={async () => {
+                    if (!name) return
+                    const created = await createDriver({ name, status: status as any, trips_today: 0, distance_today: 0 })
+                    setName("")
+                    setStatus("On Duty")
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-2 py-2 text-sm whitespace-nowrap"
+                >
+                  Save Driver
+                </Button>
               </div>
             </div>
+            
             <div className="border border-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader className="bg-muted">
